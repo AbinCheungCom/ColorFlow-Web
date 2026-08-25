@@ -60,9 +60,10 @@ async function loadKeyList() {
         const resp = await apiFetch('/api/keys/' + encodeURIComponent(keyId), { method: 'DELETE' });
         const d = await resp.json();
         if (d.success) {
-          // 如果撤销的是当前正在用的 key，清除 localStorage
-          if (localStorage.getItem('colorflow_api_key') === keyId) {
+          // 如果撤销的是当前正在用的 key，清除 localStorage（按非敏感 key_id 比对）
+          if (localStorage.getItem('colorflow_api_key_id') === keyId) {
             localStorage.removeItem('colorflow_api_key');
+            localStorage.removeItem('colorflow_api_key_id');
           }
           loadKeyList();
           updateMcpConfig();
@@ -113,6 +114,7 @@ if (generateKeyBtn) {
       if (data.success) {
         newKeyDisplay.value = data.key;
         localStorage.setItem('colorflow_api_key', data.key);
+        if (data.key_id) localStorage.setItem('colorflow_api_key_id', data.key_id);
         keyModal.classList.remove('hidden');
         loadKeyList();
         updateMcpConfig();
@@ -248,6 +250,7 @@ if (restartBtn) {
 if (clearApiKeyBtn) {
   clearApiKeyBtn.addEventListener('click', () => {
     localStorage.removeItem('colorflow_api_key');
+    localStorage.removeItem('colorflow_api_key_id');
     clearApiKeyBtn.textContent = '✓ 已清除';
     setTimeout(() => { clearApiKeyBtn.textContent = '清除本地 Key'; }, 1500);
     updateMcpConfig();

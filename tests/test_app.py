@@ -1,6 +1,7 @@
 """ColorFlow Web 集成测试"""
 
 import io
+import json
 from pathlib import Path
 
 import pytest
@@ -191,7 +192,7 @@ class TestApiAuth:
             r = client.get("/api/pantone/colors", headers={"x-api-key": "中文😀"})
             assert r.status_code == 401
         finally:
-            keystore.revoke(test_key)
+            keystore.revoke(entry["key_id"])
 
     def test_static_and_index_open_when_configured(self, monkeypatch):
         from colorflow_keys import keystore
@@ -201,7 +202,7 @@ class TestApiAuth:
             assert client.get("/").status_code == 200
             assert client.get("/static/app.js").status_code == 200
         finally:
-            keystore.revoke(test_key)
+            keystore.revoke(entry["key_id"])
 
 
 class TestKeyManagement:
@@ -212,6 +213,7 @@ class TestKeyManagement:
         from colorflow_keys import keystore
         entry = keystore.generate(name="mgmt-test")
         key = entry["key"]
+        key_id = entry["key_id"]
         try:
             # 列出 keys
             r = client.get("/api/keys", headers={"x-api-key": key})
@@ -219,22 +221,26 @@ class TestKeyManagement:
             data = r.get_json()
             assert data["success"] is True
             assert data["count"] > 0
-            # 验证脱敏
+            # 验证脱敏 + key_id 非敏感（P0-1：响应中不得出现明文 key）
             for k in data["keys"]:
                 assert "****" in k["key_masked"]
+                assert k["key_id"] != key
+                assert k["key_id"].startswith("kid_")
+                assert key not in json.dumps(k)
         finally:
-            keystore.revoke(key)
+            keystore.revoke(key_id)
 
     def test_revoke(self):
         from colorflow_keys import keystore
         entry = keystore.generate(name="revoke-test")
         key = entry["key"]
+        key_id = entry["key_id"]
         try:
-            r = client.delete("/api/keys/" + key, headers={"x-api-key": key})
+            r = client.delete("/api/keys/" + key_id, headers={"x-api-key": key})
             assert r.status_code == 200
             assert r.get_json()["success"] is True
         finally:
-            keystore.revoke(key)  # 幂等
+            keystore.revoke(key_id)  # 幂等
 
 
 class TestTraceColors:

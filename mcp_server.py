@@ -15,7 +15,6 @@
 """
 
 import json
-import math
 import os
 
 from fastmcp import FastMCP
@@ -37,6 +36,8 @@ from app import sdk
 
 # API Key 校验（与 Web API 共用同一份 KeyStore）
 from colorflow_keys import keystore
+
+from services.color_delta_e import delta_e_cie76
 
 mcp = FastMCP("ColorFlow")
 
@@ -74,7 +75,7 @@ def _delta_e(hex_color: str, cmyk) -> float:
     """计算 HEX 与某 CMYK 色之间的 ΔE（CIELAB 欧氏距离近似）"""
     lab_hex = _rgb_to_lab(*_hex_to_rgb(hex_color))
     lab_pantone = _cmyk_to_lab(*cmyk)
-    return math.sqrt(sum((a - b) ** 2 for a, b in zip(lab_hex, lab_pantone)))
+    return delta_e_cie76(lab_hex, lab_pantone)
 
 
 def _check_ext(image_path: str) -> str | None:
@@ -314,7 +315,7 @@ def match_pantone(hex_color: str) -> str:
     for m in results.get("matches", [])[:5]:
         c, mm, y, k = m["c"], m["m"], m["y"], m["k"]
         lab_pantone = _cmyk_to_lab(c, mm, y, k)
-        de = round(math.sqrt(sum((a - b) ** 2 for a, b in zip(lab_hex, lab_pantone))), 2)
+        de = round(delta_e_cie76(lab_hex, lab_pantone), 2)
         interp = (
             "excellent — imperceptible" if de < 1
             else "good — barely perceptible" if de < 3
@@ -689,17 +690,21 @@ def export_pantone_pdf(
     rgb: list = None,
     input_hex: str = "",
     matches: list = None,
+    svg_base64: str = "",
+    palette: list = None,
 ) -> str:
-    """生成 Pantone 色卡或匹配报告 PDF（CMYK，印刷级）。
+    """生成 Pantone 色卡 / 匹配报告 / 主色提取报告 PDF（CMYK，印刷级）。
 
     Args:
-        export_type: 导出类型 — swatch（单个色卡）| report（匹配报告）
+        export_type: 导出类型 — swatch（单个色卡）| report（匹配报告）| palette（主色提取报告）
         name: 色卡模式下的 Pantone 色号名称
         hex_color: 色卡模式下的 HEX 值（如 "#DA291C"）
         cmyk: 色卡模式下的 CMYK 值 [c, m, y, k]
         rgb: 色卡模式下的 RGB 值 [r, g, b]
         input_hex: 报告模式下的输入色 HEX
         matches: 报告模式下的匹配列表 [{name, hex, cmyk, delta_e}]
+        svg_base64: 主色报告模式下的描图 SVG（base64）
+        palette: 主色报告模式下的主色列表 [{color:{hex,rgb,share}, pantone_matches:[{name,hex,cmyk,delta_e}]}]
     Returns:
         JSON: {success, pdf_path}
     """
@@ -712,78 +717,30 @@ def export_pantone_pdf(
         rgb = [0, 0, 0]
     if matches is None:
         matches = []
+    if palette is None:
+        palette = []
     try:
         import tempfile
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.colors import CMYKColor, Color
-        from reportlab.pdfgen import canvas
-        from PIL import Image as _PILImage
+        from services.color_pdf import render_pantone_pdf
 
-        def _hex_to_cmyk(h):
-            h = h.lstrip("#")
-            r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-            c = _PILImage.new("RGB", (1, 1), (r, g, b)).convert("CMYK").load()[0, 0]
-            return CMYKColor(c[0] / 255, c[1] / 255, c[2] / 255, c[3] / 255)
+        data = {
+            "name": name,
+            "hex": hex_color,
+            "cmyk": cmyk,
+            "rgb": rgb,
+            "input_hex": input_hex,
+            "matches": matches,
+            "svg_base64": svg_base64,
+            "palette": palette,
+        }
+        pdf_bytes = render_pantone_pdf(export_type, data)
 
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp.write(pdf_bytes)
             pdf_path = tmp.name
-        c = canvas.Canvas(pdf_path, pagesize=A4)
-        page_w, page_h = A4
-
-        if export_type == "swatch":
-            swatch_x, swatch_y = 50, page_h - 250
-            c.setFillColor(_hex_to_cmyk(hex_color))
-            c.rect(swatch_x, swatch_y, 180, 180, fill=1, stroke=0)
-            text_x = swatch_x + 210
-            text_y = swatch_y + 160
-            c.setFillColor(Color(0, 0, 0))
-            c.setFont("Helvetica-Bold", 20)
-            c.drawString(text_x, text_y, name)
-            c.setFont("Helvetica", 12)
-            c.drawString(text_x, text_y - 30, "HEX    " + hex_color.upper())
-            c.drawString(text_x, text_y - 50, "CMYK   {} / {} / {} / {}".format(*cmyk))
-            c.drawString(text_x, text_y - 70, "RGB    {} / {} / {}".format(*rgb))
-            c.setFont("Helvetica", 9)
-            c.setFillColor(Color(0.5, 0.5, 0.5))
-            c.drawString(50, 40, "ColorFlow · 色卡规格")
-
-        elif export_type == "report":
-            c.setFillColor(Color(0, 0, 0))
-            c.setFont("Helvetica-Bold", 18)
-            c.drawString(50, page_h - 60, "色彩匹配报告")
-            c.setFillColor(_hex_to_cmyk(input_hex))
-            c.rect(50, page_h - 160, 60, 60, fill=1, stroke=0)
-            c.setFillColor(Color(0, 0, 0))
-            c.setFont("Helvetica", 12)
-            c.drawString(125, page_h - 110, "输入色 " + input_hex.upper())
-            y = page_h - 200
-            c.setFont("Helvetica-Bold", 11)
-            c.drawString(50, y, "色块")
-            c.drawString(120, y, "Pantone")
-            c.drawString(330, y, "HEX")
-            c.drawString(430, y, "ΔE")
-            y -= 6
-            c.setStrokeColor(Color(0.8, 0.8, 0.8))
-            c.line(50, y, page_w - 50, y)
-            y -= 25
-            for m in matches:
-                c.setFillColor(_hex_to_cmyk(m.get("hex", "#000000")))
-                c.rect(50, y - 14, 50, 20, fill=1, stroke=0)
-                c.setFillColor(Color(0, 0, 0))
-                c.setFont("Helvetica", 11)
-                c.drawString(120, y - 8, m.get("name", ""))
-                c.drawString(330, y - 8, m.get("hex", "").upper())
-                c.drawString(430, y - 8, str(m.get("delta_e", 0)))
-                y -= 35
-            c.setFont("Helvetica", 9)
-            c.setFillColor(Color(0.5, 0.5, 0.5))
-            c.drawString(50, 40, "ColorFlow · 色彩匹配报告 · 输入色 " + input_hex.upper())
-
-        else:
-            return json.dumps({"error": "export_type 必须是 swatch 或 report"}, ensure_ascii=False)
-
-        c.save()
         return json.dumps({"success": True, "pdf_path": pdf_path}, ensure_ascii=False)
+    except ValueError as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": f"导出失败: {e}"}, ensure_ascii=False)
 
