@@ -8,6 +8,7 @@ import pytest
 
 import app as app_module
 from app import app
+from colorflow_keys import keystore
 
 client = app.test_client()
 
@@ -525,3 +526,100 @@ class TestRestart:
         # 不做断言，仅验证端点不会崩溃
         # 真实重启不在测试环境执行，避免影响其他测试
         assert resp.status_code in (200, 404)
+
+
+class TestPantoneExport:
+    """Pantone PDF 导出端点（P2-12b 重构后：swatch / report / palette 走共享渲染）"""
+
+    def _authed(self):
+        entry = keystore.generate(name="pdf-test")
+        return entry["key"], entry["key_id"]
+
+    def test_invalid_type(self):
+        key, kid = self._authed()
+        try:
+            r = client.post(
+                "/api/pantone/export",
+                json={"type": "bogus"},
+                headers={"x-api-key": key},
+            )
+            assert r.status_code == 400
+            assert "Invalid type" in r.get_json()["error"]
+        finally:
+            keystore.revoke(kid)
+
+    def test_swatch(self):
+        key, kid = self._authed()
+        try:
+            r = client.post(
+                "/api/pantone/export",
+                json={
+                    "type": "swatch",
+                    "name": "PMS 485 C",
+                    "hex": "#DA291C",
+                    "cmyk": [0, 91, 84, 4],
+                    "rgb": [218, 41, 28],
+                },
+                headers={"x-api-key": key},
+            )
+            assert r.status_code == 200
+            assert r.data[:5] == b"%PDF-"
+        finally:
+            keystore.revoke(kid)
+
+    def test_report(self):
+        key, kid = self._authed()
+        try:
+            r = client.post(
+                "/api/pantone/export",
+                json={
+                    "type": "report",
+                    "input_hex": "#DA291C",
+                    "matches": [
+                        {"name": "PMS 485 C", "hex": "#DA291C",
+                         "cmyk": [0, 91, 84, 4], "delta_e": 0.0}
+                    ],
+                },
+                headers={"x-api-key": key},
+            )
+            assert r.status_code == 200
+            assert r.data[:5] == b"%PDF-"
+        finally:
+            keystore.revoke(kid)
+
+    def test_palette(self):
+        key, kid = self._authed()
+        try:
+            r = client.post(
+                "/api/pantone/export",
+                json={
+                    "type": "palette",
+                    "svg_base64": "",
+                    "palette": [
+                        {"color": {"hex": "#DA291C", "rgb": [218, 41, 28], "share": 0.6},
+                         "pantone_matches": [
+                             {"name": "PMS 485 C", "hex": "#DA291C",
+                              "cmyk": [0, 91, 84, 4], "delta_e": 0.5}
+                         ]}
+                    ],
+                },
+                headers={"x-api-key": key},
+            )
+            assert r.status_code == 200
+            assert r.data[:5] == b"%PDF-"
+        finally:
+            keystore.revoke(kid)
+
+    def test_null_optional_fields_do_not_500(self):
+        """可选列表字段传 null 不得 500（P2-12b 边界健壮性修复）。"""
+        key, kid = self._authed()
+        try:
+            r = client.post(
+                "/api/pantone/export",
+                json={"type": "report", "input_hex": "#DA291C", "matches": None},
+                headers={"x-api-key": key},
+            )
+            assert r.status_code == 200
+            assert r.data[:5] == b"%PDF-"
+        finally:
+            keystore.revoke(kid)

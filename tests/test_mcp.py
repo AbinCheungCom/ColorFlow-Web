@@ -197,6 +197,22 @@ class TestExportPantonePdf:
         data = json.loads(ms.export_pantone_pdf(export_type="invalid"))
         assert data.get("error")
 
+    def test_palette(self):
+        # P2-12b 回归：此前 MCP 端缺 palette 导出（与 Web 行为偏差），修复后应可用
+        data = json.loads(ms.export_pantone_pdf(
+            export_type="palette",
+            svg_base64="",
+            palette=[
+                {"color": {"hex": "#DA291C", "rgb": [218, 41, 28], "share": 0.6},
+                 "pantone_matches": [
+                     {"name": "485 C", "hex": "#DA291C",
+                      "cmyk": [0, 85, 95, 5], "delta_e": 0.5}
+                 ]},
+            ],
+        ))
+        assert data["success"] is True
+        assert data["pdf_path"]
+
 
 class TestGreyscale3D:
     """MCP greyscale3d 工具测试"""

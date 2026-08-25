@@ -45,10 +45,10 @@ def render_pantone_pdf(export_type: str, data: dict) -> bytes:
 
     if export_type == "swatch":
         # === 单个色卡 ===
-        name = data.get("name", "Unknown")
-        hex_val = data.get("hex", "#000000")
-        cmyk = data.get("cmyk", [0, 0, 0, 100])
-        rgb = data.get("rgb", [0, 0, 0])
+        name = data.get("name") or "Unknown"
+        hex_val = data.get("hex") or "#000000"
+        cmyk = data.get("cmyk") or [0, 0, 0, 100]
+        rgb = data.get("rgb") or [0, 0, 0]
 
         swatch_x = 50
         swatch_y = page_h - 250
@@ -76,8 +76,8 @@ def render_pantone_pdf(export_type: str, data: dict) -> bytes:
 
     elif export_type == "report":
         # === 匹配报告 ===
-        input_hex = data.get("input_hex", "#000000")
-        matches = data.get("matches", [])
+        input_hex = data.get("input_hex") or "#000000"
+        matches = data.get("matches") or []
 
         # 标题
         c.setFillColor(Color(0, 0, 0))
@@ -126,8 +126,8 @@ def render_pantone_pdf(export_type: str, data: dict) -> bytes:
 
     elif export_type == "palette":
         # === 主色提取报告（首图 SVG + 主色 + Pantone 匹配列表）===
-        svg_b64 = data.get("svg_base64", "")
-        palette = data.get("palette", [])
+        svg_b64 = data.get("svg_base64") or ""
+        palette = data.get("palette") or []
 
         # ---- 标题 ----
         c.setFillColor(Color(0, 0, 0))
@@ -198,7 +198,7 @@ def render_pantone_pdf(export_type: str, data: dict) -> bytes:
                 c.setFont("Helvetica", 8)
                 list_y = page_h - 60
 
-            color = item.get("color", {})
+            color = item.get("color") or {}
             top = (item.get("pantone_matches") or [None])[0]
 
             hex_val = color.get("hex", "#000000")

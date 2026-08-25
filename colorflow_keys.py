@@ -98,7 +98,7 @@ class KeyStore:
         return entry
 
     def verify(self, raw_key):
-        """校验 key 是否有效，返回 bool；有效时更新 last_used"""
+        """校验 key 是否有效，返回 bool；有效时更新 last_used（写盘失败不阻断认证）"""
         if not raw_key:
             return False
         with _lock:
@@ -107,8 +107,15 @@ class KeyStore:
                 if secrets.compare_digest(
                     raw_key.encode("utf-8"), entry["key"].encode("utf-8")
                 ):
-                    entry["last_used"] = _now_iso()
-                    self._save(keys)
+                    now = _now_iso()
+                    # 认证热路径：仅在 last_used 变化时写盘，且写盘失败不抛异常，
+                    # 避免磁盘异常把整个 /api/* 打挂（见开发文档 P0-1 热路径不抛错）
+                    if entry.get("last_used") != now:
+                        entry["last_used"] = now
+                        try:
+                            self._save(keys)
+                        except OSError:
+                            pass
                     return True
             return False
 
@@ -130,7 +137,9 @@ class KeyStore:
         return result
 
     def revoke(self, key_id):
-        """按非敏感 key_id 撤销指定 key，返回 bool"""
+        """按非敏感 key_id 撤销指定 key，返回 bool（空 id 直接拒绝，避免误清空全部）"""
+        if not key_id:
+            return False
         with _lock:
             keys = self._load()
             before = len(keys)

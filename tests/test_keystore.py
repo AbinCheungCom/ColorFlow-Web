@@ -9,7 +9,7 @@ import json
 import os
 import tempfile
 
-from colorflow_keys import KeyStore
+from colorflow_keys import KeyStore, _now_iso
 
 
 def _fresh_keystore():
@@ -109,6 +109,58 @@ def test_bootstrap_from_env_assigns_key_id():
     # 幂等：再次 bootstrap 同一 env key 不重复
     ks.bootstrap_from_env("cf_sk_fromenv" + "b" * 21)
     assert len(ks.list_all()) == 1
+
+
+def test_revoke_rejects_empty_id_without_wiping():
+    """空 / None key_id 撤销必须被拒绝，不得清空全部 key（数据防误删）。"""
+    ks, _ = _fresh_keystore()
+    e1 = ks.generate(name="a")
+    e2 = ks.generate(name="b")
+    assert ks.revoke("") is False
+    assert ks.revoke(None) is False
+    assert len(ks.list_all()) == 2
+    assert ks.revoke(e1["key_id"]) is True
+    assert ks.revoke(e2["key_id"]) is True
+    assert ks.has_any() is False
+
+
+def test_verify_tolerates_persist_failure():
+    """认证热路径：写盘失败（磁盘异常）不得阻断 verify（P0-1 不抛错）。"""
+    ks, _ = _fresh_keystore()
+    entry = ks.generate(name="durable")
+
+    def boom(keys):
+        raise OSError("disk full")
+
+    ks._save = boom
+    assert ks.verify(entry["key"]) is True  # 校验成功，即便 last_used 持久化失败
+    assert ks.verify("cf_sk_wrong") is False
+
+
+def test_verify_skips_write_when_last_used_unchanged():
+    """last_used 在同一秒内未变化时，verify 不重复写盘（认证热路径减负）。"""
+    import colorflow_keys
+
+    ks, _ = _fresh_keystore()
+    entry = ks.generate(name="hot")
+    fixed = "2026-01-01T00:00:00+00:00"
+    with open(ks.path, "w", encoding="utf-8") as f:
+        json.dump([dict(entry, last_used=fixed)], f)
+    orig_now = colorflow_keys._now_iso
+    colorflow_keys._now_iso = lambda: fixed
+    try:
+        calls = []
+        orig_save = ks._save
+
+        def counting(keys):
+            calls.append(1)
+            orig_save(keys)
+
+        ks._save = counting
+        assert ks.verify(entry["key"]) is True
+        assert calls == []
+    finally:
+        colorflow_keys._now_iso = orig_now
 
 
 _RUNNABLE = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
