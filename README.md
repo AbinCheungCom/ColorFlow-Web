@@ -2,7 +2,24 @@
 
 > AI 位图抠图 + 矢量描图 + Pantone 色彩管理 — 一个页面搞定从位图到透明 PNG / SVG / 印刷落地
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<!-- 徽标区 -->
+<p align="center">
+  <a href="https://opensource.org/licenses/MIT"><img alt="License" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
+  <a href="https://www.python.org/downloads/"><img alt="Python" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white"></a>
+  <a href="https://github.com/Abinius/ColorFlow-Web/releases"><img alt="Version" src="https://img.shields.io/github/v/tag/Abinius/ColorFlow-Web?sort=semver&label=release&color=blue"></a>
+  <a href="https://github.com/Abinius/ColorFlow-Web/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Abinius/ColorFlow-Web/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="Tests" src="https://img.shields.io/badge/tests-212%20passed-brightgreen.svg">
+  <img alt="MCP Tools" src="https://img.shields.io/badge/MCP%20Tools-17-7B61FF">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg">
+  <img alt="GPU" src="https://img.shields.io/badge/GPU-0%20local%20inference-important.svg">
+  <img alt="Stack" src="https://img.shields.io/badge/Stack-Flask%20%2F%20rembg%20%2F%20VTracer%20%2F%20Pantone-24423b.svg">
+</p>
+<p align="center">
+  <a href="https://github.com/Abinius/ColorFlow-Web/issues"><img alt="Issues" src="https://img.shields.io/github/issues/Abinius/ColorFlow-Web?color=red"></a>
+  <a href="https://github.com/Abinius/ColorFlow-Web/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Abinius/ColorFlow-Web?style=social"></a>
+  <a href="https://github.com/Abinius/ColorFlow-Web"><img alt="Repo" src="https://img.shields.io/github/repo-size/Abinius/ColorFlow-Web?color=blueviolet"></a>
+  <a href="https://github.com/Abinius/ColorFlow-Web/commits/main"><img alt="Last Commit" src="https://img.shields.io/github/last-commit/Abinius/ColorFlow-Web?color=orange"></a>
+</p>
 
 ## 定位
 
