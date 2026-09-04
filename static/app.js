@@ -1367,40 +1367,8 @@ async function genPollJob(jobId) {
   genShowError('生成超时，请重试');
 }
 
-if (genBtn) {
-  genBtn.addEventListener('click', async () => {
-    const prompt = genPrompt.value.trim();
-    if (!prompt) return;
-    genBtn.disabled = true;
-    genBtn.querySelector('.btn-text').classList.add('hidden');
-    genBtn.querySelector('.btn-loader').classList.remove('hidden');
-    genResults.innerHTML = '<div class="svg-placeholder">排队中，准备提交…</div>';
-    genHint.textContent = '生成图为灵感稿，印刷请走右侧生产链路';
-
-    const formData = new FormData();
-    formData.append('prompt', prompt);
-    formData.append('backend', genBackend.value);
-    formData.append('n', genN.value);
-    formData.append('size', genSize.value);
-    if (genRefFileObj) formData.append('ref_image', genRefFileObj);
-
-    try {
-      const resp = await apiFetch('/api/generate/jobs', { method: 'POST', body: formData });
-      const data = await resp.json();
-      if (!data.success || !data.job_id) {
-        genShowError(data.error || '提交失败');
-        return;
-      }
-      await genPollJob(data.job_id);
-    } catch (e) {
-      genShowError(fetchErrorMessage(e));
-    } finally {
-      genBtn.disabled = false;
-      genBtn.querySelector('.btn-text').classList.remove('hidden');
-      genBtn.querySelector('.btn-loader').classList.add('hidden');
-    }
-  });
-}
+// 注：genBtn 的点击 handler 在下方 S4-C 批量生图段落统一注册（onclick）
+// 此处不再用 addEventListener，避免双触发
 
 function renderGenResults(images, elapsedMs) {
   let html = `<div class="gen-results-meta">${images.length} 张 · ${elapsed_ms_label(elapsedMs)}</div>`;
@@ -1636,7 +1604,6 @@ setupMcpApiKey();
 let _genMode = 'single';
 const genModeBtns = document.querySelectorAll('.gen-mode-btn');
 const genPromptLabel = document.getElementById('genPromptLabel');
-const genPrompt = document.getElementById('genPrompt');
 genModeBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     genModeBtns.forEach(b => b.classList.remove('active'));
@@ -1688,7 +1655,6 @@ if (genOptimizeBtn) {
 }
 
 // ── 批量生图 ──
-const genBtn = document.getElementById('genBtn');
 // 替换原有的单张生图 handler，支持批量模式
 if (genBtn) {
   genBtn.onclick = async () => {
