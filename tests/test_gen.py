@@ -80,6 +80,9 @@ class TestAvailableBackends:
     def test_none_configured(self, monkeypatch):
         for k in ("VOLCANO_API_KEY", "FAL_KEY", "COMFYUI_URL"):
             monkeypatch.delenv(k, raising=False)
+        # 同时屏蔽 LLM Key Store（防止文件中有残留 key 影响测试）
+        import llm_keys
+        monkeypatch.setattr(llm_keys.llm_keystore, "get_key", lambda p: None)
         assert available_backends() == []
 
     def test_priority_order(self, monkeypatch):
@@ -124,6 +127,8 @@ class TestDispatchAuto:
     def test_no_backend_configured(self, monkeypatch):
         for k in ("VOLCANO_API_KEY", "FAL_KEY", "COMFYUI_URL"):
             monkeypatch.delenv(k, raising=False)
+        import llm_keys
+        monkeypatch.setattr(llm_keys.llm_keystore, "get_key", lambda p: None)
         with pytest.raises(GenError) as ei:
             dispatch("a box", backend="auto")
         assert ei.value.code == "auth"
@@ -181,6 +186,8 @@ class TestDispatchAuto:
 
     def test_specified_backend_no_key(self, monkeypatch):
         monkeypatch.delenv("VOLCANO_API_KEY", raising=False)
+        import llm_keys
+        monkeypatch.setattr(llm_keys.llm_keystore, "get_key", lambda p: None)
         with pytest.raises(GenError) as ei:
             dispatch("box", backend="volcano")
         assert ei.value.code == "auth"
@@ -552,6 +559,8 @@ class TestVisionBackends:
         """无 OPENAI_API_KEY/ANTHROPIC_API_KEY 时 auto 直接走 mock，不报错"""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        import llm_keys
+        monkeypatch.setattr(llm_keys.llm_keystore, "get_key", lambda p: None)
         r = dispatch_prompt(_png_bytes(), backend="auto")
         assert r.backend == "mock"
         assert r.prompt
@@ -571,6 +580,9 @@ class TestVisionBackends:
 
     def test_dispatch_prompt_openai_no_key_auth_error(self, monkeypatch):
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        # 同时屏蔽 LLM Key Store（防止文件中有残留 key 影响测试）
+        import llm_keys
+        monkeypatch.setattr(llm_keys.llm_keystore, "get_key", lambda p: None)
         with pytest.raises(PromptError) as ei:
             dispatch_prompt(_png_bytes(), backend="openai")
         assert ei.value.code == "auth"
