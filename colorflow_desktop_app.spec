@@ -15,7 +15,6 @@ datas = [
     (os.path.join(BASE_DIR, "static"), "static"),
     (os.path.join(BASE_DIR, "assets"), "assets"),     # ComfyUI 工作流模板
     (os.path.join(BASE_DIR, "models"), "models"),     # silueta.onnx（42MB，随包）
-    (os.path.join(BASE_DIR, "restart.ps1"), "."),
 ]
 
 hiddenimports = [

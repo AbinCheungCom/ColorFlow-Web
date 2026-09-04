@@ -308,33 +308,9 @@ def match_pantone(hex_color: str) -> str:
     except ValueError:
         return json.dumps({"error": "HEX 格式应为 #RRGGBB，包含非法字符"}, ensure_ascii=False)
 
-    from mcp_print.tools.colors import cmyk_to_rgb
+    from services.color_match import match as pantone_match
 
-    results = pantone_search(hex_color=hex_color)
-    rgb_hex = _hex_to_rgb(hex_color)
-    lab_hex = _rgb_to_lab(*rgb_hex)
-
-    matches = []
-    for m in results.get("matches", [])[:5]:
-        c, mm, y, k = m["c"], m["m"], m["y"], m["k"]
-        lab_pantone = _cmyk_to_lab(c, mm, y, k)
-        de = round(delta_e_cie76(lab_hex, lab_pantone), 2)
-        interp = (
-            "excellent — imperceptible" if de < 1
-            else "good — barely perceptible" if de < 3
-            else "fair — noticeable" if de < 6
-            else "poor — obvious"
-        )
-        rgb = cmyk_to_rgb(c, mm, y, k)
-        matches.append({
-            "name": m["name"],
-            "hex": m["hex"],
-            "cmyk": [c, mm, y, k],
-            "rgb": [rgb["r"], rgb["g"], rgb["b"]],
-            "delta_e": de,
-            "interpretation": interp,
-        })
-
+    matches = pantone_match(hex_color)
     return json.dumps({"success": True, "hex": hex_color, "matches": matches}, ensure_ascii=False)
 
 
@@ -380,24 +356,9 @@ def pantone_colors(
     page = max(page, 1)
     limit = min(max(limit, 1), 200)
     try:
-        db = _load_db()
-        if search:
-            s = search.lower()
-            db = [c for c in db if s in c.get("name", "").lower()]
-        total = len(db)
-        start = (page - 1) * limit
-        end = start + limit
-        return json.dumps(
-            {
-                "success": True,
-                "items": db[start:end],
-                "total": total,
-                "page": page,
-                "limit": limit,
-                "pages": (total + limit - 1) // limit,
-            },
-            ensure_ascii=False,
-        )
+        from services.color_list import list_colors as color_list_svc
+        result = color_list_svc(page=page, limit=limit, search=search)
+        return json.dumps({"success": True, **result}, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": f"查询失败: {e}"}, ensure_ascii=False)
 
@@ -432,8 +393,9 @@ def quote_print(
     auth = _auth_check()
     if auth:
         return auth
+    from services.cost import quote as cost_quote_svc
     try:
-        result = print_cost_estimate(
+        payload = cost_quote_svc(
             width_mm=width_mm,
             height_mm=height_mm,
             quantity=qty,
@@ -443,15 +405,6 @@ def quote_print(
         )
     except Exception as e:
         return json.dumps({"error": f"报价失败: {e}"}, ensure_ascii=False)
-    payload = {
-        "ink_cost_usd": result["ink_cost"],
-        "setup_cost_usd": result["setup_cost"],
-        "paper_cost_usd": result["paper_cost"],
-        "total_cost_usd": result["total_cost"],
-        "cost_per_unit_usd": result["cost_per_unit"],
-        "currency": result["currency"],
-        "breakdown": result["breakdown"],
-    }
     return json.dumps({"success": True, "result": payload}, ensure_ascii=False)
 
 
@@ -563,20 +516,8 @@ def trace_and_match(
     with open(svg_path, "rb") as f:
         svg_bytes = f.read()
 
-    palette = []
-    for c in extract_svg_colors(svg_bytes, top_n=5):
-        matches = [
-            {
-                "name": m["name"],
-                "hex": m["hex"],
-                "cmyk": [m["c"], m["m"], m["y"], m["k"]],
-                "delta_e": round(
-                    _delta_e(c["hex"], (m["c"], m["m"], m["y"], m["k"])), 2
-                ),
-            }
-            for m in pantone_search(hex_color=c["hex"]).get("matches", [])[:3]
-        ]
-        palette.append({"color": c, "pantone_matches": matches})
+    from services.pipeline import build_palette
+    palette = build_palette(svg_bytes, top_n=5)
 
     return json.dumps(
         {
@@ -630,48 +571,35 @@ def greyscale3d(
     bit_depth = 16 if bit_depth == 16 else 8
 
     try:
-        from PIL import Image, ImageOps, ImageEnhance, ImageFilter
+        from services.grayscale3d import generate as grey3d_generate
         import tempfile
 
-        with Image.open(image_path) as img:
-            grey = img.convert("RGB").convert("L")
+        with open(image_path, "rb") as f:
+            image_bytes = f.read()
 
-        # 高斯模糊
-        if smooth > 0:
-            grey = grey.filter(ImageFilter.GaussianBlur(radius=int(smooth)))
-
-        # 自动级别
-        if auto_levels:
-            grey = ImageOps.autocontrast(grey)
-
-        # 对比度
-        if contrast != 1.0:
-            grey = ImageEnhance.Contrast(grey).enhance(contrast)
-
-        # Gamma
-        if gamma != 1.0:
-            curve = [int(round(255 * ((p / 255.0) ** (1.0 / gamma)))) for p in range(256)]
-            grey = grey.point(curve)
-
-        # 反色
-        if invert:
-            grey = ImageOps.invert(grey)
-
-        # 位深转换
-        if bit_depth == 16:
-            grey = grey.point(lambda p: p * 257).convert("I;16")
+        result = grey3d_generate(
+            image_bytes=image_bytes,
+            invert=invert,
+            contrast=contrast,
+            gamma=gamma,
+            smooth=smooth,
+            auto_levels=auto_levels,
+            bit_depth=bit_depth,
+            include_histogram=False,
+        )
 
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
             png_path = tmp.name
-        grey.save(png_path, format="PNG")
+        with open(png_path, "wb") as f:
+            f.write(result.png_bytes)
 
         return json.dumps(
             {
                 "success": True,
                 "png_path": png_path,
-                "width": grey.width,
-                "height": grey.height,
-                "bit_depth": bit_depth,
+                "width": result.width,
+                "height": result.height,
+                "bit_depth": result.bit_depth,
             },
             ensure_ascii=False,
         )

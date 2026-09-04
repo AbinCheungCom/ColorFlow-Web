@@ -49,7 +49,7 @@ python -m venv .venv
 | 色卡 / 报告 PDF | 单色色卡 / 匹配报告 / 主色提取报告（CMYK 印刷级）|
 | 3D 灰度图 | 位图 → 8/16-bit 灰度高度图 / 位移贴图，含直方图 |
 | AI 生图 | 一句话生成包装效果图（零本地 GPU），直接送下游流水线 |
-| MCP Server | 12 个工具，Claude Code / Cursor 可直接调用 |
+| MCP Server | 17 个工具，Claude Code / Cursor 可直接调用 |
 | 一句话流水线 | full_pipeline：生图→抠图→描图→Pantone→报价→生产文件 ZIP |
 
 ## 模型说明
@@ -110,7 +110,6 @@ dist\ColorFlow.exe
 - Windows 依赖 **Edge WebView2**（Win10/11 已内置；老系统需安装）
 - 桌面入口 `colorflow_desktop_app.py` 在后台线程启动 Flask，窗口关闭即停后端
 - 上传/输出目录自动指向系统临时目录（`COLORFLOW_UPLOAD_DIR` / `COLORFLOW_OUTPUT_DIR`）
-- 详细评估见 `doc/ColorFlow-Web-桌面应用封装可行性评估.md`
 
 ## 生产部署
 

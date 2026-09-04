@@ -3,7 +3,6 @@
 from flask import Flask, render_template, request, jsonify, Response
 import os
 import base64
-import secrets
 import tempfile
 import logging
 import time
@@ -36,9 +35,7 @@ app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB
 # 上传目录：桌面封装（colorflow_desktop_app.py）通过 COLORFLOW_UPLOAD_DIR 指向临时目录；
 # 未设置时回退到 /tmp（Linux/macOS 或已 chdir 的 Windows）
 _upload_dir = os.getenv("COLORFLOW_UPLOAD_DIR") or "/tmp/colorflow-uploads"
-app.config["UPLOAD_FOLDER"] = _upload_dir
-
-os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+os.makedirs(_upload_dir, exist_ok=True)
 
 # === 日志配置：便于排查 "Failed to fetch" 等异常 ===
 logging.basicConfig(
@@ -377,11 +374,10 @@ def _trace_svg(image_bytes, image_format, params):
 # 在服务器上会导致每次抠图耗时数秒 + 内存峰值高，低配服务器易超时/崩溃，
 # 前端表现为 "TypeError: Failed to fetch"（连接被重置，不是 HTTP 错误）。
 # 解决：全局缓存 rembg session，模型只加载一次，后续请求直接复用。
-import threading as _threading
 
 _rembg_sessions: dict = {}
 _rembg_session_errors: dict = {}  # 模型加载失败缓存，避免重复下载
-_rembg_session_lock = _threading.Lock()
+_rembg_session_lock = threading.Lock()
 
 
 def _get_rembg_session(model="silueta"):
@@ -566,51 +562,16 @@ def trace_colors():
         return jsonify({"error": str(e)}), 500
 
     try:
-        # 提取主色并逐一匹配 Pantone
-        colors = extract_svg_colors(svg_bytes, top_n=5)
-        palette = []
-        for c in colors:
-            lab_hex = _rgb_to_lab(*_hex_to_rgb(c["hex"]))
-            matches = []
-            for m in pantone_search(hex_color=c["hex"]).get("matches", [])[:3]:
-                lab_pantone = _cmyk_to_lab(m["c"], m["m"], m["y"], m["k"])
-                de = delta_e_cie76(lab_hex, lab_pantone)
-                _rgb = cmyk_to_rgb(m["c"], m["m"], m["y"], m["k"])
-                matches.append(
-                    {
-                        "name": m["name"],
-                        "hex": m["hex"],
-                        "cmyk": [m["c"], m["m"], m["y"], m["k"]],
-                        "rgb": [_rgb["r"], _rgb["g"], _rgb["b"]],
-                        "delta_e": round(de, 2),
-                    }
-                )
-            palette.append(
-                {
-                    "color": {
-                        "hex": c["hex"],
-                        "count": c["count"],
-                        "share": c["share"],
-                        "rgb": list(_hex_to_rgb(c["hex"])),
-                    },
-                    "pantone_matches": matches,
-                }
-            )
-
-        return jsonify(
-            {
-                "success": True,
-                "svg_base64": base64.b64encode(svg_bytes).decode("utf-8"),
-                "size": len(svg_bytes),
-                "palette": palette,
-                "color_count": len(palette),
-            }
-        )
-    except ValidationError as e:
-        # 参数类错误（如 pantone_search 收到非法颜色），4xx，无堆栈
-        return jsonify({"error": str(e)}), 400
+        from services.pipeline import build_palette
+        palette = build_palette(svg_bytes, top_n=5)
+        return jsonify({
+            "success": True,
+            "svg_base64": base64.b64encode(svg_bytes).decode("utf-8"),
+            "size": len(svg_bytes),
+            "palette": palette,
+            "color_count": len(palette),
+        })
     except Exception as e:
-        # 真实逻辑/数据错误：记录完整堆栈便于线上排障，避免被宽泛捕获掩盖
         app.logger.exception("trace_colors 调色板构建失败")
         return jsonify({"error": f"调色板构建失败: {type(e).__name__}"}), 500
 
@@ -626,47 +587,9 @@ def match_pantone():
         return jsonify({"error": "Invalid hex_color. Expected format: #RRGGBB"}), 400
 
     try:
-        results = pantone_search(hex_color=hex_color)
-        matches = results.get("matches", [])[:5]
-
-        # Convert input hex to LAB for Delta E calculation
-        rgb_hex_tuple = _hex_to_rgb(hex_color)
-        lab_hex = _rgb_to_lab(*rgb_hex_tuple)
-
-        # Enrich with delta E and RGB
-        enriched = []
-        for m in matches:
-            c, mm, y, k = m["c"], m["m"], m["y"], m["k"]
-            rgb = cmyk_to_rgb(c, mm, y, k)
-            # Delta E via LAB
-            lab_pantone = _cmyk_to_lab(c, mm, y, k)
-            de_value = delta_e_cie76(lab_hex, lab_pantone)
-            de_interp = (
-                "excellent — imperceptible difference"
-                if de_value < 1
-                else "good — barely perceptible"
-                if de_value < 3
-                else "fair — noticeable difference"
-                if de_value < 6
-                else "poor — obvious difference"
-            )
-            enriched.append(
-                {
-                    "name": m["name"],
-                    "hex": m["hex"],
-                    "cmyk": [c, mm, y, k],
-                    "rgb": rgb,
-                    "delta_e": round(de_value, 2),
-                    "interpretation": de_interp,
-                }
-            )
-
-        return jsonify(
-            {
-                "success": True,
-                "matches": enriched,
-            }
-        )
+        from services.color_match import match as pantone_match
+        matches = pantone_match(hex_color)
+        return jsonify({"success": True, "matches": matches})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -702,29 +625,9 @@ def list_colors():
     limit = min(max(limit, 1), 200)
 
     try:
-        from mcp_print.tools.colors import _load_db
-
-        db = _load_db()
-
-        if search:
-            search = search.lower()
-            db = [c for c in db if search in c.get("name", "").lower()]
-
-        total = len(db)
-        start = (page - 1) * limit
-        end = start + limit
-        items = db[start:end]
-
-        return jsonify(
-            {
-                "success": True,
-                "items": items,
-                "total": total,
-                "page": page,
-                "limit": limit,
-                "pages": (total + limit - 1) // limit,
-            }
-        )
+        from services.color_list import list_colors as color_list_svc
+        result = color_list_svc(page=page, limit=limit, search=search)
+        return jsonify({"success": True, **result})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -736,7 +639,8 @@ def cost_quote():
     if not data:
         return jsonify({"error": "Invalid JSON body"}), 400
     try:
-        result = print_cost_estimate(
+        from services.cost import quote as cost_quote_svc
+        payload = cost_quote_svc(
             width_mm=float(data.get("width", 210)),
             height_mm=float(data.get("height", 297)),
             quantity=int(data.get("qty", 1000)),
@@ -744,22 +648,7 @@ def cost_quote():
             paper_gsm=float(data.get("gsm", 120)),
             print_method=data.get("method", "offset"),
         )
-        # 映射为前端期望的 USD 命名字段（mcp-print 返回 ink_cost/total_cost/...，无 _usd 后缀）
-        payload = {
-            "ink_cost_usd": result["ink_cost"],
-            "setup_cost_usd": result["setup_cost"],
-            "paper_cost_usd": result["paper_cost"],
-            "total_cost_usd": result["total_cost"],
-            "cost_per_unit_usd": result["cost_per_unit"],
-            "currency": result["currency"],
-            "breakdown": result["breakdown"],
-        }
-        return jsonify(
-            {
-                "success": True,
-                "result": payload,
-            }
-        )
+        return jsonify({"success": True, "result": payload})
     except (ValueError, TypeError) as e:
         return jsonify({"error": f"Invalid input: {e}"}), 400
     except Exception as e:
@@ -911,64 +800,30 @@ def grayscale3d_api():
     bit_depth = 16 if bit_depth == 16 else 8
 
     try:
-        import io as _bio
-        from PIL import Image, ImageOps, ImageEnhance, ImageFilter
+        from services.grayscale3d import generate as grey3d_generate
 
-        img = Image.open(_bio.BytesIO(image_bytes)).convert("RGB")
-        # 1) 灰度转换
-        grey = img.convert("L")
-
-        # 2) 高斯模糊平滑（必须先做，避免对模糊后数据做级别归一化影响过大）
-        if smooth > 0:
-            radius = int(smooth)
-            grey = grey.filter(ImageFilter.GaussianBlur(radius=radius))
-
-        # 3) 自动级别：归一化 0-255 全范围（扩大对比度）
-        if auto_levels:
-            grey = ImageOps.autocontrast(grey)
-
-        # 4) 对比度增强
-        if contrast != 1.0:
-            grey = ImageEnhance.Contrast(grey).enhance(contrast)
-
-        # 5) Gamma 校正（亮度曲线）
-        if gamma != 1.0:
-            # PIL 没有 ImageOps.gamma，手动 point 映射
-            curve = [int(round(255 * ((p / 255.0) ** (1.0 / gamma)))) for p in range(256)]
-            grey = grey.point(curve)
-
-        # 6) 反色（3D 场景：反色后黑=低 / 白=高）
-        if invert:
-            grey = ImageOps.invert(grey)
-
-        # 7) 位深转换 + 直方图
-        histogram_raw = grey.histogram()
-        if bit_depth == 16:
-            # 8-bit → 16-bit：每通道乘以 257（65535/255 ≈ 257）
-            grey = grey.point(lambda p: p * 257).convert("I;16")
-
-        buf = _bio.BytesIO()
-        grey.save(buf, format="PNG")
-        png_bytes = buf.getvalue()
-
-        # 直方图数据：256 个 bin，归一化为 0-1 浮点
-        hist_bins = histogram_raw[:256] if len(histogram_raw) >= 256 else histogram_raw
-        hist_total = sum(hist_bins) or 1
-        hist_norm = [v / hist_total for v in hist_bins]
-        # 找到最高 bin 索引
-        hist_peak = max(range(len(hist_bins)), key=lambda i: hist_bins[i])
+        result = grey3d_generate(
+            image_bytes=image_bytes,
+            invert=invert,
+            contrast=contrast,
+            gamma=gamma,
+            smooth=smooth,
+            auto_levels=auto_levels,
+            bit_depth=bit_depth,
+            include_histogram=True,
+        )
 
         return jsonify({
             "success": True,
-            "png_base64": base64.b64encode(png_bytes).decode("utf-8"),
-            "size": len(png_bytes),
-            "width": grey.width,
-            "height": grey.height,
-            "bit_depth": bit_depth,
-            "histogram": hist_norm,
-            "hist_peak": hist_peak,
-            "min_value": min(hist_bins),
-            "max_value": max(hist_bins),
+            "png_base64": base64.b64encode(result.png_bytes).decode("utf-8"),
+            "size": len(result.png_bytes),
+            "width": result.width,
+            "height": result.height,
+            "bit_depth": result.bit_depth,
+            "histogram": result.histogram,
+            "hist_peak": result.hist_peak,
+            "min_value": result.min_value,
+            "max_value": result.max_value,
         })
     except Exception as e:
         return jsonify({"error": f"灰度图生成失败: {e}"}), 500

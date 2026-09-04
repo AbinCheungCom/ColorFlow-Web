@@ -30,6 +30,8 @@ echo.
 echo [INFO] 启动 ColorFlow Web 服务...
 echo [INFO] 访问地址: http://127.0.0.1:5000
 echo.
+echo [DEV MODE] 启动开发服务器，生产部署请用 serve.py
+echo.
 
 REM 启动 Flask 应用
 .venv\Scripts\python.exe app.py

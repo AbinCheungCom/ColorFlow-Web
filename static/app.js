@@ -41,12 +41,56 @@ function ico(name, cls) {
   const p = ICONS[name];
   return p ? `<svg class="${cls || 'hint-ico'}" viewBox="0 0 16 16" aria-hidden="true">${p}</svg>` : '';
 }
-// 别名：GEN 页早期代码用 genIco()，保持兼容
-function genIco(name, cls) { return ico(name, cls); }
 
 // ΔE 分级（Figma match-de 配色）
 function gradeClass(de) {
   return de < 1 ? 'excellent' : de < 3 ? 'good' : de < 6 ? 'fair' : 'poor';
+}
+
+// === 通用文件上传处理 ===
+function handleImageFile(file, previewImg, uploadZone, btn, onFileSelected) {
+  if (!file.type.startsWith('image/')) { alert('请上传图片文件'); return; }
+  if (file.size > 10 * 1024 * 1024) { alert('图片不能超过 10MB'); return; }
+  if (onFileSelected) onFileSelected(file);
+  const reader = new FileReader();
+  reader.onload = e => {
+    previewImg.src = e.target.result;
+    previewImg.classList.remove('hidden');
+    uploadZone.querySelector('.upload-placeholder').classList.add('hidden');
+    if (btn) btn.disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+function setupUploadZone(zone, fileInput, handler) {
+  zone.addEventListener('click', () => fileInput.click());
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) {
+      fileInput.files = e.dataTransfer.files;
+      handler(e.dataTransfer.files[0]);
+    }
+  });
+  fileInput.addEventListener('change', e => {
+    if (e.target.files[0]) handler(e.target.files[0]);
+  });
+}
+
+// === 通用下载 ===
+function downloadData(dataUrl, filename) {
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = filename;
+  a.click();
+}
+
+// === 通用输入值显示绑定 ===
+function bindInputDisplay(inputEl, displayEl) {
+  if (!inputEl || !displayEl) return;
+  inputEl.addEventListener('input', () => { displayEl.textContent = inputEl.value; });
 }
 
 // === API Key：localStorage 持久化 + 自动附带 x-api-key 头 ===
@@ -342,40 +386,7 @@ const cutoutDownload = document.getElementById('cutoutDownload');
 
 let currentCutoutBase64 = null;
 
-cutoutUploadZone.addEventListener('click', () => cutoutFile.click());
-cutoutUploadZone.addEventListener('dragover', e => { e.preventDefault(); cutoutUploadZone.classList.add('dragover'); });
-cutoutUploadZone.addEventListener('dragleave', () => cutoutUploadZone.classList.remove('dragover'));
-cutoutUploadZone.addEventListener('drop', e => {
-  e.preventDefault();
-  cutoutUploadZone.classList.remove('dragover');
-  if (e.dataTransfer.files[0]) {
-    cutoutFile.files = e.dataTransfer.files;
-    handleCutoutFile(e.dataTransfer.files[0]);
-  }
-});
-
-cutoutFile.addEventListener('change', e => {
-  if (e.target.files[0]) handleCutoutFile(e.target.files[0]);
-});
-
-function handleCutoutFile(file) {
-  if (!file.type.startsWith('image/')) {
-    alert('请上传图片文件');
-    return;
-  }
-  if (file.size > 10 * 1024 * 1024) {
-    alert('图片不能超过 10MB');
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = e => {
-    cutoutPreviewImg.src = e.target.result;
-    cutoutPreviewImg.classList.remove('hidden');
-    cutoutUploadZone.querySelector('.upload-placeholder').classList.add('hidden');
-    cutoutBtn.disabled = false;
-  };
-  reader.readAsDataURL(file);
-}
+setupUploadZone(cutoutUploadZone, cutoutFile, f => handleImageFile(f, cutoutPreviewImg, cutoutUploadZone, cutoutBtn));
 
 cutoutBtn.addEventListener('click', async () => {
   if (!cutoutFile.files[0]) return;
@@ -419,10 +430,7 @@ cutoutBtn.addEventListener('click', async () => {
 
 cutoutDownload.addEventListener('click', () => {
   if (!currentCutoutBase64) return;
-  const a = document.createElement('a');
-  a.href = 'data:image/png;base64,' + currentCutoutBase64;
-  a.download = 'colorflow_cutout.png';
-  a.click();
+    downloadData('data:image/png;base64,' + currentCutoutBase64, 'colorflow_cutout.png');
 });
 
 // === Cutout 精度面板交互 ===
@@ -447,9 +455,9 @@ if (cutoutAlphaMatting) {
     cutoutAMThresholds.classList.toggle('hidden', !cutoutAlphaMatting.checked);
   });
 }
-if (cutoutAMFG) cutoutAMFG.addEventListener('input', () => { cutoutAMFGVal.textContent = cutoutAMFG.value; });
-if (cutoutAMBG) cutoutAMBG.addEventListener('input', () => { cutoutAMBGVal.textContent = cutoutAMBG.value; });
-if (cutoutAMErode) cutoutAMErode.addEventListener('input', () => { cutoutAMErodeVal.textContent = cutoutAMErode.value; });
+bindInputDisplay(cutoutAMFG, cutoutAMFGVal);
+bindInputDisplay(cutoutAMBG, cutoutAMBGVal);
+bindInputDisplay(cutoutAMErode, cutoutAMErodeVal);
 
 // === Vector Trace ===
 const uploadZone = document.getElementById('uploadZone');
@@ -474,47 +482,14 @@ const lengthThresholdVal = document.getElementById('lengthThresholdVal');
 
 let currentSvgBase64 = null;
 
-filterSpeckle.addEventListener('input', () => speckleVal.textContent = filterSpeckle.value);
-pathPrecision.addEventListener('input', () => precisionVal.textContent = pathPrecision.value);
-colorPrecision.addEventListener('input', () => colorPrecisionVal.textContent = colorPrecision.value);
-layerDifference.addEventListener('input', () => layerDifferenceVal.textContent = layerDifference.value);
-cornerThreshold.addEventListener('input', () => cornerThresholdVal.textContent = cornerThreshold.value);
-lengthThreshold.addEventListener('input', () => lengthThresholdVal.textContent = lengthThreshold.value);
+bindInputDisplay(filterSpeckle, speckleVal);
+bindInputDisplay(pathPrecision, precisionVal);
+bindInputDisplay(colorPrecision, colorPrecisionVal);
+bindInputDisplay(layerDifference, layerDifferenceVal);
+bindInputDisplay(cornerThreshold, cornerThresholdVal);
+bindInputDisplay(lengthThreshold, lengthThresholdVal);
 
-uploadZone.addEventListener('click', () => traceFile.click());
-uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
-uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
-uploadZone.addEventListener('drop', e => {
-  e.preventDefault();
-  uploadZone.classList.remove('dragover');
-  if (e.dataTransfer.files[0]) {
-    traceFile.files = e.dataTransfer.files;
-    handleFile(e.dataTransfer.files[0]);
-  }
-});
-
-traceFile.addEventListener('change', e => {
-  if (e.target.files[0]) handleFile(e.target.files[0]);
-});
-
-function handleFile(file) {
-  if (!file.type.startsWith('image/')) {
-    alert('请上传图片文件');
-    return;
-  }
-  if (file.size > 10 * 1024 * 1024) {
-    alert('图片不能超过 10MB');
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = e => {
-    previewImg.src = e.target.result;
-    previewImg.classList.remove('hidden');
-    uploadZone.querySelector('.upload-placeholder').classList.add('hidden');
-    traceBtn.disabled = false;
-  };
-  reader.readAsDataURL(file);
-}
+setupUploadZone(uploadZone, traceFile, f => handleImageFile(f, previewImg, uploadZone, traceBtn));
 
 const traceMode = document.getElementById('traceMode');
 const ignoreWhite = document.getElementById('ignoreWhite');
@@ -599,10 +574,7 @@ traceBtn.addEventListener('click', async () => {
 
 downloadSvg.addEventListener('click', () => {
   if (!currentSvgBase64) return;
-  const a = document.createElement('a');
-  a.href = 'data:image/svg+xml;base64,' + currentSvgBase64;
-  a.download = 'colorflow_output.svg';
-  a.click();
+    downloadData('data:image/svg+xml;base64,' + currentSvgBase64, 'colorflow_output.svg');
 });
 
 // === 导出印刷 PDF（export_print 前端入口） ===
@@ -640,10 +612,7 @@ document.getElementById('exportPdfConfirm').addEventListener('click', async () =
       return;
     }
     const blob = await resp.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'colorflow_print.pdf';
-    a.click();
+    downloadData(URL.createObjectURL(blob), 'colorflow_print.pdf');
     URL.revokeObjectURL(a.href);
   } catch (e) {
     alert('导出失败: ' + fetchErrorMessage(e));
@@ -770,10 +739,7 @@ colorMatchBtn.addEventListener('click', async () => {
           return;
         }
         const blob = await resp.blob();
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'colorflow_palette_report.pdf';
-        a.click();
+        downloadData(URL.createObjectURL(blob), 'colorflow_palette_report.pdf');
         URL.revokeObjectURL(a.href);
       } catch (e) {
         alert('导出失败: ' + fetchErrorMessage(e));
@@ -858,10 +824,7 @@ if (pantoneExportBtn) {
       });
       if (!resp.ok) { const d = await resp.json().catch(() => ({})); alert('导出失败: ' + (d.error || resp.status)); return; }
       const blob = await resp.blob();
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `pantone_${pantoneLookupResult.name.replace(/\s/g, '_')}.pdf`;
-      a.click();
+      downloadData(URL.createObjectURL(blob), `pantone_${pantoneLookupResult.name.replace(/\s/g, '_')}.pdf`);
       URL.revokeObjectURL(a.href);
     } catch (e) {
       alert('导出失败: ' + fetchErrorMessage(e));
@@ -953,10 +916,7 @@ if (matchExportBtn) {
       });
       if (!resp.ok) { const d = await resp.json().catch(() => ({})); alert('导出失败: ' + (d.error || resp.status)); return; }
       const blob = await resp.blob();
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `pantone_match_report.pdf`;
-      a.click();
+      downloadData(URL.createObjectURL(blob), `pantone_match_report.pdf`);
       URL.revokeObjectURL(a.href);
     } catch (e) {
       alert('导出失败: ' + fetchErrorMessage(e));
@@ -989,44 +949,11 @@ const g3dSmoothVal = document.getElementById('g3dSmoothVal');
 
 let currentG3DBase64 = null;
 
-g3dContrast.addEventListener('input', () => g3dContrastVal.textContent = g3dContrast.value);
-g3dGamma.addEventListener('input', () => g3dGammaVal.textContent = g3dGamma.value);
-g3dSmooth.addEventListener('input', () => g3dSmoothVal.textContent = g3dSmooth.value);
+bindInputDisplay(g3dContrast, g3dContrastVal);
+bindInputDisplay(g3dGamma, g3dGammaVal);
+bindInputDisplay(g3dSmooth, g3dSmoothVal);
 
-g3dUploadZone.addEventListener('click', () => g3dFile.click());
-g3dUploadZone.addEventListener('dragover', e => { e.preventDefault(); g3dUploadZone.classList.add('dragover'); });
-g3dUploadZone.addEventListener('dragleave', () => g3dUploadZone.classList.remove('dragover'));
-g3dUploadZone.addEventListener('drop', e => {
-  e.preventDefault();
-  g3dUploadZone.classList.remove('dragover');
-  if (e.dataTransfer.files[0]) {
-    g3dFile.files = e.dataTransfer.files;
-    handleG3DFile(e.dataTransfer.files[0]);
-  }
-});
-
-g3dFile.addEventListener('change', e => {
-  if (e.target.files[0]) handleG3DFile(e.target.files[0]);
-});
-
-function handleG3DFile(file) {
-  if (!file.type.startsWith('image/')) {
-    alert('请上传图片文件');
-    return;
-  }
-  if (file.size > 10 * 1024 * 1024) {
-    alert('图片不能超过 10MB');
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = e => {
-    g3dPreviewImg.src = e.target.result;
-    g3dPreviewImg.classList.remove('hidden');
-    g3dUploadZone.querySelector('.upload-placeholder').classList.add('hidden');
-    g3dBtn.disabled = false;
-  };
-  reader.readAsDataURL(file);
-}
+setupUploadZone(g3dUploadZone, g3dFile, f => handleImageFile(f, g3dPreviewImg, g3dUploadZone, g3dBtn));
 
 g3dBtn.addEventListener('click', async () => {
   if (!g3dFile.files[0]) return;
@@ -1089,10 +1016,7 @@ g3dBtn.addEventListener('click', async () => {
 
 g3dDownload.addEventListener('click', () => {
   if (!currentG3DBase64) return;
-  const a = document.createElement('a');
-  a.href = 'data:image/png;base64,' + currentG3DBase64;
-  a.download = 'colorflow_3d_greyscale.png';
-  a.click();
+    downloadData('data:image/png;base64,' + currentG3DBase64, 'colorflow_3d_greyscale.png');
 });
 
 // ============================================================
@@ -1122,30 +1046,7 @@ if (genPrompt) {
 
 // 参考图上传区
 if (genRefZone) {
-  genRefZone.addEventListener('click', () => genRefFile.click());
-  genRefZone.addEventListener('dragover', e => { e.preventDefault(); genRefZone.classList.add('dragover'); });
-  genRefZone.addEventListener('dragleave', () => genRefZone.classList.remove('dragover'));
-  genRefZone.addEventListener('drop', e => {
-    e.preventDefault();
-    genRefZone.classList.remove('dragover');
-    if (e.dataTransfer.files[0]) handleGenRefFile(e.dataTransfer.files[0]);
-  });
-  genRefFile.addEventListener('change', e => {
-    if (e.target.files[0]) handleGenRefFile(e.target.files[0]);
-  });
-}
-
-function handleGenRefFile(file) {
-  if (!file.type.startsWith('image/')) { alert('请上传图片文件'); return; }
-  if (file.size > 10 * 1024 * 1024) { alert('图片不能超过 10MB'); return; }
-  genRefFileObj = file;
-  const reader = new FileReader();
-  reader.onload = e => {
-    genRefPreviewImg.src = e.target.result;
-    genRefPreviewImg.classList.remove('hidden');
-    genRefZone.querySelector('.upload-placeholder').classList.add('hidden');
-  };
-  reader.readAsDataURL(file);
+  setupUploadZone(genRefZone, genRefFile, f => handleImageFile(f, genRefPreviewImg, genRefZone, null, v => genRefFileObj = v));
 }
 
 // ── 反向闭环（图→prompt）──
@@ -1155,31 +1056,7 @@ const genReversePreviewImg = document.getElementById('genReversePreviewImg');
 const genReverseBtn = document.getElementById('genReverseBtn');
 
 if (genReverseZone) {
-  genReverseZone.addEventListener('click', () => genReverseFile.click());
-  genReverseZone.addEventListener('dragover', e => { e.preventDefault(); genReverseZone.classList.add('dragover'); });
-  genReverseZone.addEventListener('dragleave', () => genReverseZone.classList.remove('dragover'));
-  genReverseZone.addEventListener('drop', e => {
-    e.preventDefault();
-    genReverseZone.classList.remove('dragover');
-    if (e.dataTransfer.files[0]) handleGenReverseFile(e.dataTransfer.files[0]);
-  });
-  genReverseFile.addEventListener('change', e => {
-    if (e.target.files[0]) handleGenReverseFile(e.target.files[0]);
-  });
-}
-
-function handleGenReverseFile(file) {
-  if (!file.type.startsWith('image/')) { alert('请上传图片文件'); return; }
-  if (file.size > 10 * 1024 * 1024) { alert('图片不能超过 10MB'); return; }
-  genReverseFileObj = file;
-  genReverseBtn.disabled = false;
-  const reader = new FileReader();
-  reader.onload = e => {
-    genReversePreviewImg.src = e.target.result;
-    genReversePreviewImg.classList.remove('hidden');
-    genReverseZone.querySelector('.upload-placeholder').classList.add('hidden');
-  };
-  reader.readAsDataURL(file);
+  setupUploadZone(genReverseZone, genReverseFile, f => handleImageFile(f, genReversePreviewImg, genReverseZone, genReverseBtn, v => genReverseFileObj = v));
 }
 
 // 反向闭环：图→prompt 提取并回填到 prompt 框
@@ -1206,7 +1083,7 @@ if (genReverseBtn) {
         genPrompt.value = data.prompt;
         genBtn.disabled = false;
       }
-      genHint.innerHTML = genIco('refresh') + 'prompt 已由图像自动提取（'
+      genHint.innerHTML = ico('refresh') + 'prompt 已由图像自动提取（'
         + escapeHtml(data.backend || '-') + ' · ' + (data.elapsed_ms || 0)
         + 'ms），可直接生成或微调后再生成';
     } catch (e) {
@@ -1235,7 +1112,7 @@ async function loadGenBackends() {
         list.innerHTML = '<div class="key-empty">未配置任何生图后端 Key · 请在下方配置</div>';
       } else {
         list.innerHTML = backends.map(b => {
-          const dot = genIco(b.available ? 'check' : 'close', 'dot-ico ' + (b.available ? 'ok' : 'no'));
+          const dot = ico(b.available ? 'check' : 'close', 'dot-ico ' + (b.available ? 'ok' : 'no'));
           const model = b.model ? `<span class="gen-backend-model">${escapeHtml(b.model)}</span>` : '';
           return `<div class="gen-backend-row"><span class="gen-backend-dot">${dot}</span>
             <span class="gen-backend-label">${escapeHtml(b.label)}</span>${model}</div>`;
@@ -1269,9 +1146,9 @@ async function loadGenBackends() {
           '　·　<a class="gen-link" data-open-settings="llm">切换模型 / 换后端 →</a>';
         needCfg.classList.remove('gen-warn');
       } else {
-        needCfg.innerHTML = `${genIco('warning')}尚未配置任何生图后端 Key，无法生成<br>` +
+        needCfg.innerHTML = `${ico('warning')}尚未配置任何生图后端 Key，无法生成<br>` +
           `<button class="btn btn-small btn-primary" data-open-settings="llm">`
-          + genIco('key', 'btn-ico') + '<span class="btn-text">去配置大模型 API Key →</span></button>';
+          + ico('key', 'btn-ico') + '<span class="btn-text">去配置大模型 API Key →</span></button>';
         needCfg.classList.add('gen-warn');
       }
     }
@@ -1556,10 +1433,7 @@ if (genResults) {
     if (!img) return;
     const act = btn.dataset.act;
     if (act === 'download') {
-      const a = document.createElement('a');
-      a.href = 'data:image/png;base64,' + img.png_base64;
-      a.download = `colorflow_gen_${idx + 1}.png`;
-      a.click();
+            downloadData('data:image/png;base64,' + img.png_base64, `colorflow_gen_${idx + 1}.png`);
     } else if (act === 'cutout-trace') {
       // 抠图+描图：注入描图 Tab 并切到 cutout 模式（rembg 抠图后描图，输出透明 SVG）
       genInjectToTrace(img.png_base64, 'cutout');
@@ -1692,7 +1566,7 @@ function updateTplPreview(template) {
     prompt = prompt.replace('{' + sel.dataset.param + '}', val);
   });
   const preview = document.getElementById('genTplPreview');
-  if (preview) preview.innerHTML = genIco('memo') + escapeHtml(prompt);
+  if (preview) preview.innerHTML = ico('memo') + escapeHtml(prompt);
   genTplHint.textContent = '点击「应用模板」回填到上方 prompt 框';
 }
 
@@ -1727,7 +1601,7 @@ if (genTplApply) {
         genPrompt.value = resultPrompt;
         genBtn.disabled = false;
       }
-      genHint.innerHTML = genIco('palette') + 'prompt 已由模板「' + escapeHtml(sel.name) + '」生成，可直接生成或微调后再生成';
+      genHint.innerHTML = ico('palette') + 'prompt 已由模板「' + escapeHtml(sel.name) + '」生成，可直接生成或微调后再生成';
     } catch (e) {
       genTplHint.textContent = '渲染失败：' + fetchErrorMessage(e);
     }
@@ -1777,7 +1651,7 @@ if (genOptimizeBtn) {
     const prompt = genPrompt.value.trim();
     if (!prompt) { genPromptHint.textContent = '请先输入 prompt'; return; }
     genOptimizeBtn.disabled = true;
-    genPromptHint.innerHTML = genIco('sparkles') + '优化中…';
+    genPromptHint.innerHTML = ico('sparkles') + '优化中…';
     try {
       const resp = await apiFetch('/api/prompt/optimize', {
         method: 'POST',
@@ -1787,14 +1661,14 @@ if (genOptimizeBtn) {
       const data = await resp.json();
       if (data.success) {
         genPrompt.value = data.prompt;
-        genPromptHint.innerHTML = genIco('check') + '已优化（' + escapeHtml(data.backend || '-') + '）';
+        genPromptHint.innerHTML = ico('check') + '已优化（' + escapeHtml(data.backend || '-') + '）';
         genPromptHint.style.color = 'var(--success)';
       } else {
-        genPromptHint.innerHTML = genIco('close') + escapeHtml(data.error || '优化失败');
+        genPromptHint.innerHTML = ico('close') + escapeHtml(data.error || '优化失败');
         genPromptHint.style.color = 'var(--error)';
       }
     } catch (e) {
-      genPromptHint.innerHTML = genIco('close') + escapeHtml(fetchErrorMessage(e));
+      genPromptHint.innerHTML = ico('close') + escapeHtml(fetchErrorMessage(e));
       genPromptHint.style.color = 'var(--error)';
     }
     genOptimizeBtn.disabled = false;
@@ -1815,7 +1689,7 @@ if (genBtn) {
       // 批量模式
       const prompts = promptText.split('\n').map(s => s.trim()).filter(Boolean);
       if (prompts.length === 0) { genBtn.disabled = false; genBtn.querySelector('.btn-text').textContent = '生成效果图'; return; }
-      genPromptHint.innerHTML = genIco('box') + '批量模式：' + prompts.length + ' 个 prompt';
+      genPromptHint.innerHTML = ico('box') + '批量模式：' + prompts.length + ' 个 prompt';
       try {
         const formData = new FormData();
         prompts.forEach((p, i) => formData.append('prompts', p));
@@ -1828,14 +1702,14 @@ if (genBtn) {
         if (data.success) {
           await pollBatchJob(data.batch_id, prompts);
         } else {
-          genPromptHint.innerHTML = genIco('close') + escapeHtml(data.error || '提交失败');
+          genPromptHint.innerHTML = ico('close') + escapeHtml(data.error || '提交失败');
         }
       } catch (e) {
-        genPromptHint.innerHTML = genIco('close') + escapeHtml(fetchErrorMessage(e));
+        genPromptHint.innerHTML = ico('close') + escapeHtml(fetchErrorMessage(e));
       }
     } else {
       // 单张模式（原有逻辑）
-      genPromptHint.innerHTML = genIco('sparkles') + '生成中…';
+      genPromptHint.innerHTML = ico('sparkles') + '生成中…';
       try {
         const formData = new FormData();
         formData.append('prompt', promptText);
@@ -1848,10 +1722,10 @@ if (genBtn) {
         if (data.success) {
           await genPollJob(data.job_id);
         } else {
-          genPromptHint.innerHTML = genIco('close') + escapeHtml(data.error || '提交失败');
+          genPromptHint.innerHTML = ico('close') + escapeHtml(data.error || '提交失败');
         }
       } catch (e) {
-        genPromptHint.innerHTML = genIco('close') + escapeHtml(fetchErrorMessage(e));
+        genPromptHint.innerHTML = ico('close') + escapeHtml(fetchErrorMessage(e));
       }
     }
     genBtn.disabled = false;
@@ -1871,13 +1745,13 @@ async function pollBatchJob(batchId, prompts) {
         return;
       }
       if (job.status === 'failed') {
-        genPromptHint.innerHTML = genIco('close') + escapeHtml(job.error || '批量失败');
+        genPromptHint.innerHTML = ico('close') + escapeHtml(job.error || '批量失败');
         return;
       }
       genPromptHint.textContent = job.progress || '批量处理中…';
     } catch (e) { /* 继续轮询 */ }
   }
-  genPromptHint.innerHTML = genIco('clock') + '批量超时，请重试';
+  genPromptHint.innerHTML = ico('clock') + '批量超时，请重试';
 }
 
 function renderBatchResults(job) {
@@ -1885,7 +1759,7 @@ function renderBatchResults(job) {
   if (!results) return;
   const images = job.images || [];
   const errors = job.errors || [];
-  let html = `<div class="gen-batch-summary">${genIco('box', 'hint-ico')} ${job.prompt_count} 个 prompt → ${images.length} 张图` +
+  let html = `<div class="gen-batch-summary">${ico('box', 'hint-ico')} ${job.prompt_count} 个 prompt → ${images.length} 张图` +
     (errors.length ? ` · ${errors.length} 个失败` : '') + ` · ${(job.elapsed_ms / 1000).toFixed(1)}s</div>`;
   html += '<div class="gen-grid">';
   images.forEach((img, idx) => {
@@ -1903,7 +1777,7 @@ function renderBatchResults(job) {
   if (errors.length) {
     html += '<div class="gen-batch-errors">';
     errors.forEach(e => {
-      html += `<div class="gen-batch-error-item">${genIco('close', 'hint-ico')} ${escapeHtml((e.prompt || '').slice(0, 40))}: ${escapeHtml(e.error || '')}</div>`;
+      html += `<div class="gen-batch-error-item">${ico('close', 'hint-ico')} ${escapeHtml((e.prompt || '').slice(0, 40))}: ${escapeHtml(e.error || '')}</div>`;
     });
     html += '</div>';
   }
@@ -1914,10 +1788,7 @@ function renderBatchResults(job) {
       const idx = Number(card.dataset.idx);
       const img = images[idx];
       if (img) {
-        const a = document.createElement('a');
-        a.href = 'data:image/png;base64,' + img.png_base64;
-        a.download = `batch_${idx + 1}.png`;
-        a.click();
+                downloadData('data:image/png;base64,' + img.png_base64, `batch_${idx + 1}.png`);
       }
     });
   });
@@ -1984,7 +1855,7 @@ if (genSaveRefBtn) {
       gallery.push({ name: file.name, dataUrl: e.target.result, size: file.size });
       localStorage.setItem(REF_GALLERY_KEY, JSON.stringify(gallery));
       loadRefGallery();
-      genPromptHint.innerHTML = genIco('save') + '已保存到图库（' + gallery.length + ' 张）';
+      genPromptHint.innerHTML = ico('save') + '已保存到图库（' + gallery.length + ' 张）';
       genPromptHint.style.color = 'var(--success)';
       setTimeout(() => { genPromptHint.textContent = ''; }, 2500);
     };
@@ -2049,7 +1920,7 @@ if (genTplCustomBtn) {
     saveCustomTemplates(tpls);
     _genTplData = mergeAllTemplates();
     renderTplSelect();
-    genPromptHint.innerHTML = genIco('check') + '已创建自定义模板「' + escapeHtml(name) + '」';
+    genPromptHint.innerHTML = ico('check') + '已创建自定义模板「' + escapeHtml(name) + '」';
     genPromptHint.style.color = 'var(--success)';
     setTimeout(() => { genPromptHint.textContent = ''; }, 2500);
   });
@@ -2062,10 +1933,7 @@ if (genTplExportBtn) {
     const tpls = loadCustomTemplates();
     if (tpls.length === 0) { alert('暂无自定义模板可导出'); return; }
     const blob = new Blob([JSON.stringify(tpls, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'colorflow_templates.json';
-    a.click();
+    downloadData(URL.createObjectURL(blob), 'colorflow_templates.json');
   });
 }
 
@@ -2091,10 +1959,10 @@ if (genTplImportFile) {
         saveCustomTemplates(merged);
         _genTplData = mergeAllTemplates();
         renderTplSelect();
-        genPromptHint.innerHTML = genIco('check') + '已导入 ' + imported.length + ' 个模板';
+        genPromptHint.innerHTML = ico('check') + '已导入 ' + imported.length + ' 个模板';
         genPromptHint.style.color = 'var(--success)';
       } catch (err) {
-        genPromptHint.innerHTML = genIco('close') + '导入失败：' + escapeHtml(err.message);
+        genPromptHint.innerHTML = ico('close') + '导入失败：' + escapeHtml(err.message);
         genPromptHint.style.color = 'var(--error)';
       }
       setTimeout(() => { genPromptHint.textContent = ''; }, 3000);

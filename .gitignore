@@ -22,3 +22,6 @@ htmlcov/
 
 # rembg 妯″瀷缂撳瓨锛堥潪浠撳簱鍐呯疆鐨勪笅杞芥ā鍨嬶級
 models/models/
+
+# 大模型文件（通过 download_models.py 下载）
+models/u2net_human_seg.onnx

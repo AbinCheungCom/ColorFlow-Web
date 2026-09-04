@@ -16,7 +16,6 @@ build/
 .venv/
 venv/
 env/
-.venv/
 
 # IDE / 编辑器
 .vscode/
@@ -46,7 +45,6 @@ colorflow-output/
 colorflow_desktop_app.spec
 requirements-desktop.txt
 *.ico
-make_icon.py
 
 # 大文件 / 模型（模型由 Dockerfile 显式 COPY 或运行时下载）
 # 注意：models/silueta.onnx 若体积较大，可注释下行并从 GitHub Release 拉取
@@ -56,11 +54,7 @@ make_icon.py
 docs/
 doc/
 
-# 实验/调试文件
-test_rembg.py
-test_cutout_debug.py
-test_cutout_api.py
-colorflow.ico
+# 实验/调试文件（已删除，保留排除项以防误提交）
 
 # macOS
 .DS_Store
