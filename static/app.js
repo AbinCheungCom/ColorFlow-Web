@@ -5,40 +5,44 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// === GEN 页 SVG 图标（替代 emoji，16×16 / currentColor）===
-// 用法：genIco('sparkles') 默认 hint-ico；genIco('key', 'btn-ico') 指定类名
-const GEN_ICON_PATHS = {
-  // 星芒（✨）
+// === 全站 SVG 图标库（替代 emoji，16×16 / currentColor）===
+// 用法：ico('sparkles') 默认 hint-ico；ico('key', 'btn-ico') 指定类名
+const ICONS = {
+  // 星芒
   sparkles: '<path fill="currentColor" d="M6 6.4 7.2 8.8 9.6 10 7.2 11.2 6 13.6 4.8 11.2 2.4 10 4.8 8.8z"/><path fill="currentColor" d="M12.5 1.8 13.25 3.25 14.7 4 13.25 4.75 12.5 6.2 11.75 4.75 10.3 4 11.75 3.25z"/>',
-  // 调色盘（🎨）
+  // 调色盘
   palette: '<path d="M8 2.6a5.4 5.4 0 1 0 .38 10.79c1.05.1 1.5-.55 1.22-1.43-.35-1.1.28-1.85 1.37-1.95 1.55-.14 2.75-1.15 2.75-3.01A5.4 5.4 0 0 0 8 2.6z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="5.4" cy="6.3" r=".9" fill="currentColor"/><circle cx="8.2" cy="5" r=".9" fill="currentColor"/><circle cx="10.9" cy="6.3" r=".9" fill="currentColor"/>',
-  // 放大镜（🔍）
+  // 放大镜
   search: '<circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2 13.6 13.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-  // 软盘（💾）
+  // 软盘
   save: '<path d="M3.2 2.8h7.4l2.2 2.2v8.2a.4.4 0 0 1-.4.4H3.2a.4.4 0 0 1-.4-.4V3.2a.4.4 0 0 1 .4-.4z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.4 2.8v3.4h4.6V2.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.2 13V8.8h5.6V13" fill="none" stroke="currentColor" stroke-width="1.3"/>',
-  // 图库（📷）
+  // 图库
   image: '<rect x="2.6" y="3.4" width="10.8" height="9.2" rx="1.1" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="5.9" cy="6.7" r="1.1" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M2.6 11.2 5.8 8l2.3 2.2 2.3-2.4 3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
-  // 钥匙（🔑）
+  // 钥匙
   key: '<circle cx="5.4" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8.3 8h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.4 8v2.1M13.3 8v1.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-  // 循环（🔁）
+  // 循环
   refresh: '<path d="M12.9 5.6A5 5 0 1 0 13.4 9.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M13.2 2.6v3.1h-3.1" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
-  // 警告（⚠️）
+  // 警告
   warning: '<path d="M8 2.6 14.4 13.2H1.6z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 6.6v3.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="11.6" r=".55" fill="currentColor"/>',
-  // 对勾（✅）
+  // 对勾
   check: '<path d="M3.5 8.6 6.4 11.5 12.5 4.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
-  // 叉（❌）
+  // 叉
   close: '<path d="M4.2 4.2 11.8 11.8M11.8 4.2 4.2 11.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
-  // 包裹（📦）
+  // 空圈（未配置状态）
+  circle: '<circle cx="8" cy="8" r="5.2" fill="none" stroke="currentColor" stroke-width="1.3"/>',
+  // 包裹
   box: '<path d="M8 2.2 13.6 5v6L8 13.8 2.4 11V5z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M2.4 5 8 7.8 13.6 5M8 7.8v6" fill="none" stroke="currentColor" stroke-width="1.2"/>',
-  // 文档（📝）
+  // 文档
   memo: '<rect x="3.4" y="2.4" width="9.2" height="11.2" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M5.4 5.8h5.2M5.4 8h5.2M5.4 10.2h3.2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
-  // 时钟（⏰）
+  // 时钟
   clock: '<circle cx="8" cy="8" r="5.4" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 5v3.2l2.2 1.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
 };
-function genIco(name, cls) {
-  const p = GEN_ICON_PATHS[name];
+function ico(name, cls) {
+  const p = ICONS[name];
   return p ? `<svg class="${cls || 'hint-ico'}" viewBox="0 0 16 16" aria-hidden="true">${p}</svg>` : '';
 }
+// 别名：GEN 页早期代码用 genIco()，保持兼容
+function genIco(name, cls) { return ico(name, cls); }
 
 // ΔE 分级（Figma match-de 配色）
 function gradeClass(de) {
@@ -168,7 +172,7 @@ if (copyNewKeyBtn) {
   copyNewKeyBtn.addEventListener('click', () => {
     newKeyDisplay.select();
     document.execCommand('copy');
-    copyNewKeyBtn.textContent = '✓ 已复制';
+    copyNewKeyBtn.innerHTML = ico('check', 'btn-ico') + '<span class="btn-text">已复制</span>';
     setTimeout(() => { copyNewKeyBtn.textContent = '复制 Key'; }, 1500);
   });
 }
@@ -187,7 +191,7 @@ if (copyMcpConfigBtn) {
     const block = document.getElementById('mcpConfig');
     block.select ? block.select() : null;
     navigator.clipboard.writeText(block.textContent).then(() => {
-      copyMcpConfigBtn.textContent = '✓ 已复制';
+      copyMcpConfigBtn.innerHTML = ico('check', 'btn-ico') + '<span class="btn-text">已复制</span>';
       setTimeout(() => { copyMcpConfigBtn.textContent = '复制配置'; }, 1500);
     });
   });
@@ -283,7 +287,7 @@ if (restartBtn) {
       const resp = await apiFetch('/api/restart', { method: 'POST' });
       const data = await resp.json();
       if (data.success) {
-        restartHint.textContent = '✓ ' + data.message;
+        restartHint.innerHTML = ico('check') + escapeHtml(data.message || '重启成功');
         restartHint.style.color = 'var(--success)';
         // 等 2 秒后自动跳转描图页
         setTimeout(() => {
@@ -292,11 +296,11 @@ if (restartBtn) {
           if (traceTab) traceTab.click();
         }, 2000);
       } else {
-        restartHint.textContent = '✗ ' + (data.error || '重启失败');
+        restartHint.innerHTML = ico('close') + escapeHtml(data.error || '重启失败');
         restartHint.style.color = 'var(--error)';
       }
     } catch (e) {
-      restartHint.textContent = '✗ 请求失败: ' + fetchErrorMessage(e);
+      restartHint.innerHTML = ico('close') + '请求失败: ' + escapeHtml(fetchErrorMessage(e));
       restartHint.style.color = 'var(--error)';
     } finally {
       restartBtn.innerHTML = origHTML;
@@ -309,7 +313,7 @@ if (clearApiKeyBtn) {
   clearApiKeyBtn.addEventListener('click', () => {
     localStorage.removeItem('colorflow_api_key');
     localStorage.removeItem('colorflow_api_key_id');
-    clearApiKeyBtn.textContent = '✓ 已清除';
+    clearApiKeyBtn.innerHTML = ico('check', 'btn-ico') + '<span class="btn-text">已清除</span>';
     setTimeout(() => { clearApiKeyBtn.textContent = '清除本地 Key'; }, 1500);
     updateMcpConfig();
   });
@@ -1293,7 +1297,7 @@ async function loadLLMKeys() {
       return;
     }
     list.innerHTML = providers.map(p => {
-      const dot = p.has_key ? '✅' : '⚪';
+      const dot = ico(p.has_key ? 'check' : 'circle', 'dot-ico ' + (p.has_key ? 'ok' : 'off'));
       const preview = p.key_masked ? ` · ${p.key_masked}` : '';
       const uses = (p.uses || []).map(u => ({gen:'生图',vision:'图→prompt',optimize:'优化'}[u]||u)).join('、');
       const keyPh = p.key_prefix ? p.key_prefix + 'xxxxxxxx' : 'API Key';
@@ -1359,17 +1363,17 @@ async function saveLLMKey(provider, keyInput, baseInput, modelInput) {
     });
     const data = await resp.json();
     if (data.success) {
-      if (hint) { hint.textContent = '✅ 已保存'; hint.style.color = 'var(--success)'; }
+      if (hint) { hint.innerHTML = ico('check') + '已保存'; hint.style.color = 'var(--success)'; }
       if (keyInput) keyInput.value = '';
       setTimeout(() => { if (hint) hint.textContent = ''; }, 2500);
       loadLLMKeys();
       loadGenBackends();
       loadVisionBackends();
     } else {
-      if (hint) { hint.textContent = '❌ ' + (data.error || '保存失败'); hint.style.color = 'var(--error)'; }
+      if (hint) { hint.innerHTML = ico('close') + escapeHtml(data.error || '保存失败'); hint.style.color = 'var(--error)'; }
     }
   } catch (e) {
-    if (hint) { hint.textContent = '❌ ' + fetchErrorMessage(e); hint.style.color = 'var(--error)'; }
+    if (hint) { hint.innerHTML = ico('close') + escapeHtml(fetchErrorMessage(e)); hint.style.color = 'var(--error)'; }
   }
 }
 
@@ -1379,16 +1383,16 @@ async function removeLLMKey(provider) {
     const resp = await apiFetch('/api/llm-keys/'+provider, { method: 'DELETE' });
     const data = await resp.json();
     if (data.success) {
-      if (hint) { hint.textContent = '✅ 已删除'; hint.style.color = 'var(--success)'; }
+      if (hint) { hint.innerHTML = ico('check') + '已删除'; hint.style.color = 'var(--success)'; }
       setTimeout(() => { if (hint) hint.textContent = ''; }, 2500);
       loadLLMKeys();
       loadGenBackends();
       loadVisionBackends();
     } else {
-      if (hint) { hint.textContent = '❌ ' + (data.error || '删除失败'); hint.style.color = 'var(--error)'; }
+      if (hint) { hint.innerHTML = ico('close') + escapeHtml(data.error || '删除失败'); hint.style.color = 'var(--error)'; }
     }
   } catch (e) {
-    if (hint) { hint.textContent = '❌ ' + fetchErrorMessage(e); hint.style.color = 'var(--error)'; }
+    if (hint) { hint.innerHTML = ico('close') + escapeHtml(fetchErrorMessage(e)); hint.style.color = 'var(--error)'; }
   }
 }
 
@@ -1405,7 +1409,7 @@ async function loadVisionBackends() {
       return;
     }
     list.innerHTML = data.backends.map(b => {
-      const dot = b.available ? '✅' : '❌';
+      const dot = ico(b.available ? 'check' : 'close', 'dot-ico ' + (b.available ? 'ok' : 'no'));
       return `<div class="gen-backend-row"><span class="gen-backend-dot">${dot}</span>
         <span class="gen-backend-label">${escapeHtml(b.label)}</span></div>`;
     }).join('');
@@ -1425,8 +1429,8 @@ function setupMcpApiKey() {
   if (saved) { input.value = saved; input.placeholder = '已配置（' + saved.slice(0,6) + '…）'; }
   saveBtn.addEventListener('click', () => {
     const v = input.value.trim();
-    if (v) { localStorage.setItem('colorflow_mcp_key', v); hint.textContent = '✅ 已保存'; }
-    else { localStorage.removeItem('colorflow_mcp_key'); hint.textContent = '✅ 已清除'; }
+    if (v) { localStorage.setItem('colorflow_mcp_key', v); hint.innerHTML = ico('check') + '已保存'; }
+    else { localStorage.removeItem('colorflow_mcp_key'); hint.innerHTML = ico('check') + '已清除'; }
     hint.style.color = 'var(--success)';
     input.value = ''; input.placeholder = 'cfk_xxxxxxxx（可选，留空则 MCP 无鉴权）';
     updateMcpConfig(); setTimeout(() => { hint.textContent = ''; }, 2500);

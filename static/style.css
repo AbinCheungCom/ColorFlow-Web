@@ -715,6 +715,7 @@ body {
 .dot-ico { width: 13px; height: 13px; flex-shrink: 0; }
 .dot-ico.ok { color: var(--success, #1f9d55); }
 .dot-ico.no { color: var(--error, #d64545); }
+.dot-ico.off { color: var(--muted, #999); }
 
 .btn-loader { font-size: 14px; }
 
