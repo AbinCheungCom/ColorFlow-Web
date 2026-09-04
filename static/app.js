@@ -1051,6 +1051,7 @@ const genRefPreviewImg = document.getElementById('genRefPreviewImg');
 
 let genRefFileObj = null;
 let genResultsData = [];   // [{png_base64, width, height, backend, model}]
+let genReverseFileObj = null;  // 反向闭环：图→prompt 用
 
 // prompt 非空即启用生成按钮
 if (genPrompt) {
@@ -1085,6 +1086,75 @@ function handleGenRefFile(file) {
     genRefZone.querySelector('.upload-placeholder').classList.add('hidden');
   };
   reader.readAsDataURL(file);
+}
+
+// ── 反向闭环（图→prompt）──
+const genReverseZone = document.getElementById('genReverseZone');
+const genReverseFile = document.getElementById('genReverseFile');
+const genReversePreviewImg = document.getElementById('genReversePreviewImg');
+const genReverseBtn = document.getElementById('genReverseBtn');
+
+if (genReverseZone) {
+  genReverseZone.addEventListener('click', () => genReverseFile.click());
+  genReverseZone.addEventListener('dragover', e => { e.preventDefault(); genReverseZone.classList.add('dragover'); });
+  genReverseZone.addEventListener('dragleave', () => genReverseZone.classList.remove('dragover'));
+  genReverseZone.addEventListener('drop', e => {
+    e.preventDefault();
+    genReverseZone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) handleGenReverseFile(e.dataTransfer.files[0]);
+  });
+  genReverseFile.addEventListener('change', e => {
+    if (e.target.files[0]) handleGenReverseFile(e.target.files[0]);
+  });
+}
+
+function handleGenReverseFile(file) {
+  if (!file.type.startsWith('image/')) { alert('请上传图片文件'); return; }
+  if (file.size > 10 * 1024 * 1024) { alert('图片不能超过 10MB'); return; }
+  genReverseFileObj = file;
+  genReverseBtn.disabled = false;
+  const reader = new FileReader();
+  reader.onload = e => {
+    genReversePreviewImg.src = e.target.result;
+    genReversePreviewImg.classList.remove('hidden');
+    genReverseZone.querySelector('.upload-placeholder').classList.add('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+
+// 反向闭环：图→prompt 提取并回填到 prompt 框
+if (genReverseBtn) {
+  genReverseBtn.addEventListener('click', async () => {
+    if (!genReverseFileObj) return;
+    const btn = genReverseBtn;
+    btn.disabled = true;
+    btn.querySelector('.btn-text').classList.add('hidden');
+    btn.querySelector('.btn-loader').classList.remove('hidden');
+    try {
+      const formData = new FormData();
+      formData.append('image', genReverseFileObj);
+      formData.append('backend', 'auto');
+      formData.append('lang', 'en');
+      formData.append('style', 'product');
+      const resp = await apiFetch('/api/prompt/generate', { method: 'POST', body: formData });
+      const data = await resp.json();
+      if (!data.success) {
+        alert('提取 prompt 失败：' + (data.error || '未知错误'));
+        return;
+      }
+      if (genPrompt) {
+        genPrompt.value = data.prompt;
+        genBtn.disabled = false;
+      }
+      genHint.textContent = '🔁 prompt 已由图像自动提取（' + (data.backend || '-') + ' · ' + (data.elapsed_ms || 0) + 'ms），可直接生成或微调后再生成';
+    } catch (e) {
+      alert('提取 prompt 失败：' + fetchErrorMessage(e));
+    } finally {
+      btn.disabled = false;
+      btn.querySelector('.btn-text').classList.remove('hidden');
+      btn.querySelector('.btn-loader').classList.add('hidden');
+    }
+  });
 }
 
 // 后端状态面板（设置页 nav-gen）

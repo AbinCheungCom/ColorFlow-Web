@@ -40,6 +40,7 @@ from colorflow_keys import keystore
 from services.color_delta_e import delta_e_cie76
 
 from gen_backends import dispatch as gen_dispatch, GenError as GenGenError
+from vision_backends import dispatch_prompt, PromptError as GenPromptError
 
 mcp = FastMCP("ColorFlow")
 
@@ -825,34 +826,99 @@ def generate_image(
 
 
 # ============================================================
+# VISION 图→prompt（image2prompt 反向闭环）— 与 GEN 对称
+# ============================================================
+#
+# 闭环用法：image_to_prompt(image_path) → prompt → generate_image(prompt)
+# 或 full_pipeline(image_path=...) 一句话完成 图→prompt→生图→描图→Pantone→报价。
+# 后端：vision_backends.dispatch_prompt（openai / claude / mock，auto 降级）。
+
+
+@mcp.tool()
+def image_to_prompt(
+    image_path: str,
+    backend: str = "auto",
+    lang: str = "en",
+    style: str = "product",
+    model: str = "",
+) -> str:
+    """图→prompt：图像 → 多模态大模型描述 → 英文 prompt（image2prompt）。
+
+    闭环用法：本工具输出的 prompt 可直接传给 generate_image / full_pipeline，
+    完成「图→prompt→生图→描图→Pantone→报价」全链路。
+
+    Args:
+        image_path: 本地图像路径（必填），PNG/JPG/WebP/BMP
+        backend: auto / openai / claude / mock（默认 auto，按优先级降级）
+        lang: 输出语言 en / zh（默认 en）
+        style: 风格提示 product / poster / packaging 等（默认 product）
+        model: 覆盖模型名（空则用各后端默认）
+    Returns:
+        JSON: {success, prompt, backend, model, meta}
+    """
+    auth = _auth_check()
+    if auth:
+        return auth
+    if not image_path or not os.path.exists(image_path):
+        return json.dumps({"error": f"图像不存在: {image_path}"}, ensure_ascii=False)
+    with open(image_path, "rb") as f:
+        image_bytes = f.read()
+    try:
+        result = dispatch_prompt(image_bytes, backend=backend, lang=lang,
+                                 style=style, model=model, timeout=120)
+        return json.dumps({
+            "success": True,
+            "prompt": result.prompt,
+            "backend": result.backend,
+            "model": result.model,
+            "meta": result.meta,
+        }, ensure_ascii=False)
+    except GenPromptError as e:
+        return json.dumps(
+            {"error": f"图→prompt 失败({e.code}): {e}",
+             "code": e.code, "retryable": e.retryable},
+            ensure_ascii=False,
+        )
+
+
+# ============================================================
 # 一句话流水线（Phase 2）：生图 → 抠图 → 描图 → Pantone → 报价 → ZIP
 # ============================================================
 
 
 @mcp.tool()
 def full_pipeline(
-    prompt: str,
+    prompt: str = "",
+    image_path: str = None,
     width_mm: float = 210.0,
     height_mm: float = 297.0,
     depth_mm: float = 0.0,
     qty: int = 1000,
     colors: int = 4,
     backend: str = "auto",
+    vision_backend: str = "auto",
     output_dir: str = "/tmp/colorflow-pipeline",
 ) -> str:
     """一句话完成：生图→抠图→描图→Pantone→报价→生产文件 ZIP。
+
+    支持两种入口（二选一，互斥）：
+      - prompt:     直接给生图描述（原有用法）
+      - image_path: 给本地图像，先经 image_to_prompt 推导 prompt 再生图
+                    （图→prompt→生图 闭环，对应 docs/03 方案 B）
 
     刀板（DIELINE）模块未就绪时止于 Pantone + 报价（降级不崩溃）。
     每一步失败都记录到 errors 并继续，绝不假成功。
 
     Args:
-        prompt: 生图描述（中文/英文均可）
+        prompt: 生图描述（中文/英文均可），与 image_path 二选一
+        image_path: 本地图像路径（可选），提供时自动推导 prompt
         width_mm: 成品宽（毫米），用于报价
         height_mm: 成品高（毫米），用于报价
         depth_mm: 成品深度（毫米），刀板模块预留位
         qty: 印刷数量
         colors: 颜色数（报价用，默认 4C）
-        backend: auto / volcano / fal / comfyui
+        backend: 生图后端 auto / volcano / fal / comfyui
+        vision_backend: 图→prompt 后端 auto / openai / claude / mock
         output_dir: 输出目录
     Returns:
         JSON: {success, zip_path, files, quote, color_count, errors}
@@ -860,8 +926,26 @@ def full_pipeline(
     auth = _auth_check()
     if auth:
         return auth
+
+    # ── 入口解析：prompt 或 image_path（image_path 优先，自动推导 prompt）──
+    if image_path:
+        if not os.path.exists(image_path):
+            return json.dumps({"error": f"图像不存在: {image_path}"}, ensure_ascii=False)
+        try:
+            with open(image_path, "rb") as f:
+                image_bytes = f.read()
+            v = dispatch_prompt(image_bytes, backend=vision_backend, lang="en",
+                                style="product", timeout=120)
+            prompt = prompt or v.prompt
+        except GenPromptError as e:
+            return json.dumps(
+                {"error": f"图→prompt 失败({e.code}): {e}",
+                 "code": e.code, "retryable": e.retryable},
+                ensure_ascii=False,
+            )
+
     if not prompt or not prompt.strip():
-        return json.dumps({"error": "prompt 不能为空"}, ensure_ascii=False)
+        return json.dumps({"error": "prompt 与 image_path 至少提供一个"}, ensure_ascii=False)
 
     from mcp_print.tools.colors import cmyk_to_rgb
     import tempfile

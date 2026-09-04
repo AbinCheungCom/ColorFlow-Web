@@ -1241,6 +1241,22 @@ body {
 .gen-ref-zone {
   min-height: 96px;
 }
+.gen-reverse-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gen-reverse-block .upload-zone {
+  flex: 1 1 auto;
+}
+.gen-reverse-block .btn {
+  align-self: flex-start;
+  font-size: 12px;
+  padding: 8px 14px;
+}
+.gen-reverse-zone {
+  min-height: 88px;
+}
 .gen-hint {
   font-size: 11px;
   font-weight: 400;

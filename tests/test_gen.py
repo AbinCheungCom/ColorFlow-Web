@@ -503,3 +503,244 @@ class TestFullPipeline:
         assert data["code"] == "timeout"
         assert data["retryable"] is True
         assert not os.path.exists(str(tmp_path / "colorflow_pipeline.zip"))
+
+
+# ============================================================
+# VISION 图→prompt（image2prompt 反向闭环）
+# ============================================================
+import vision_backends as vb
+from vision_backends import PromptResult, PromptError, dispatch_prompt, available_backends as v_avail
+
+
+class TestVisionBackends:
+    """vision_backends 单元测试（mock 后端，不真实调用付费 API）"""
+
+    def test_available_backends_always_has_mock(self):
+        avail = v_avail()
+        assert "mock" in avail
+
+    def test_mock_backend_returns_prompt(self):
+        r = vb.mock_backend("", image=_png_bytes())
+        assert isinstance(r, PromptResult)
+        assert r.prompt
+        assert r.backend == "mock"
+        assert r.model == "mock-v1"
+        assert r.meta["image_bytes"] == len(_png_bytes())
+
+    def test_dispatch_prompt_bad_image_empty(self):
+        with pytest.raises(PromptError) as ei:
+            dispatch_prompt(b"", backend="mock")
+        assert ei.value.code == "bad_image"
+
+    def test_dispatch_prompt_bad_image_too_large(self):
+        big = b"\x00" * (26 * 1024 * 1024)
+        with pytest.raises(PromptError) as ei:
+            dispatch_prompt(big, backend="mock")
+        assert ei.value.code == "bad_image"
+
+    def test_dispatch_prompt_unknown_backend(self):
+        with pytest.raises(PromptError) as ei:
+            dispatch_prompt(_png_bytes(), backend="nonsense")
+        assert ei.value.code == "upstream"
+
+    def test_dispatch_prompt_explicit_mock(self):
+        r = dispatch_prompt(_png_bytes(), backend="mock")
+        assert r.backend == "mock"
+        assert r.prompt
+
+    def test_dispatch_prompt_auto_no_real_keys_falls_back_to_mock(self, monkeypatch):
+        """无 OPENAI_API_KEY/ANTHROPIC_API_KEY 时 auto 直接走 mock，不报错"""
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        r = dispatch_prompt(_png_bytes(), backend="auto")
+        assert r.backend == "mock"
+        assert r.prompt
+
+    def test_dispatch_prompt_auto_real_backend_failure_degrades_to_mock(self, monkeypatch):
+        """openai 失败(retryable) → claude 未配 → 降级 mock"""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+        def boom(prompt, **kw):
+            raise PromptError("timeout", "openai slow", retryable=True)
+
+        monkeypatch.setitem(vb._BACKENDS, "openai", boom)
+        r = dispatch_prompt(_png_bytes(), backend="auto")
+        assert r.backend == "mock"
+        assert r.meta.get("fallback_from") == "timeout"
+
+    def test_dispatch_prompt_openai_no_key_auth_error(self, monkeypatch):
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        with pytest.raises(PromptError) as ei:
+            dispatch_prompt(_png_bytes(), backend="openai")
+        assert ei.value.code == "auth"
+        assert ei.value.retryable is False
+
+    def test_system_prompt_contains_language(self):
+        assert "English" in vb._system_prompt("product", "en")
+        assert "中文" in vb._system_prompt("product", "zh")
+
+
+class TestPromptAPI:
+    """/api/prompt/* API 测试"""
+
+    def test_backends_status(self):
+        resp = client.get("/api/prompt/backends")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["success"] is True
+        assert isinstance(data["backends"], list)
+        ids = {b["id"] for b in data["backends"]}
+        assert {"openai", "claude", "mock"} == ids
+        # mock 始终 available
+        mock = next(b for b in data["backends"] if b["id"] == "mock")
+        assert mock["available"] is True
+
+    def test_generate_missing_file(self):
+        resp = client.post("/api/prompt/generate", data={},
+                           content_type="multipart/form-data")
+        assert resp.status_code == 400
+        assert "image" in resp.get_json()["error"]
+
+    def test_generate_empty_filename(self):
+        resp = client.post("/api/prompt/generate",
+                           data={"image": (io.BytesIO(b"x"), "")},
+                           content_type="multipart/form-data")
+        assert resp.status_code == 400
+
+    def test_generate_unsupported_type(self):
+        resp = client.post("/api/prompt/generate",
+                           data={"image": (io.BytesIO(b"x"), "a.txt", "text/plain")},
+                           content_type="multipart/form-data")
+        assert resp.status_code == 415
+
+    def test_generate_mock_success(self):
+        resp = client.post("/api/prompt/generate",
+                           data={
+                               "image": (io.BytesIO(_png_bytes()), "ref.png", "image/png"),
+                               "backend": "mock",
+                               "lang": "en",
+                               "style": "product",
+                           },
+                           content_type="multipart/form-data")
+        assert resp.status_code == 200, resp.get_json()
+        data = resp.get_json()
+        assert data["success"] is True
+        assert data["prompt"]
+        assert data["backend"] == "mock"
+        assert data["elapsed_ms"] >= 0
+
+    def test_generate_auto_falls_back_to_mock(self):
+        """无真实 Key 时 auto 走 mock，不报错"""
+        resp = client.post("/api/prompt/generate",
+                           data={
+                               "image": (io.BytesIO(_png_bytes()), "ref.png", "image/png"),
+                               "backend": "auto",
+                           },
+                           content_type="multipart/form-data")
+        assert resp.status_code == 200, resp.get_json()
+        assert resp.get_json()["backend"] == "mock"
+
+
+class TestMCPImageToPrompt:
+    """MCP image_to_prompt 工具测试"""
+
+    def test_registered(self):
+        import mcp_server as ms
+        assert callable(ms.image_to_prompt)
+
+    def test_missing_file(self):
+        import mcp_server as ms
+        data = json.loads(ms.image_to_prompt("/no/such/path.png"))
+        assert data.get("error")
+
+    def test_success_with_mock(self, monkeypatch, tmp_path):
+        import mcp_server as ms
+        png_path = tmp_path / "ref.png"
+        png_path.write_bytes(_png_bytes())
+        data = json.loads(ms.image_to_prompt(str(png_path), backend="mock"))
+        assert data["success"] is True
+        assert data["prompt"]
+        assert data["backend"] == "mock"
+
+    def test_auth_blocks_when_key_mismatch(self, monkeypatch, tmp_path):
+        """配置了 COLORFLOW_API_KEY 且请求无 x-api-key → _auth_check 返回错误 JSON"""
+        import mcp_server as ms
+        png_path = tmp_path / "ref.png"
+        png_path.write_bytes(_png_bytes())
+        # 模拟 keystore 中已有 key（任意非空字符串），但 env 未配置 → 应拒绝
+        monkeypatch.setattr(ms.keystore, "has_any", lambda: True)
+        data = json.loads(ms.image_to_prompt(str(png_path), backend="mock"))
+        assert data.get("error")
+        assert "API Key" in data["error"]
+
+
+class TestFullPipelineImage:
+    """full_pipeline(image_path=...) 闭环测试"""
+
+    def test_success_with_image_path(self, monkeypatch, tmp_path):
+        """图→prompt→生图→描图→Pantone→报价→ZIP 全链路"""
+        import mcp_server as ms
+        import zipfile
+
+        png = _png_bytes()
+        src = tmp_path / "src.png"
+        src.write_bytes(png)
+        out = tmp_path / "pipeline"
+
+        # 图→prompt 走 mock
+        monkeypatch.setattr(ms, "dispatch_prompt",
+                            lambda b, **kw: PromptResult(
+                                prompt="a red gift box on white background",
+                                backend="mock", model="mock-v1"))
+
+        def fake_dispatch(prompt, **kw):
+            # 断言：prompt 来自 image_to_prompt，而非空
+            assert "red gift box" in prompt
+            return [GenResult(png_bytes=png, width=1, height=1,
+                              backend="fal", model="flux")]
+
+        monkeypatch.setattr("mcp_server.gen_dispatch", fake_dispatch)
+        monkeypatch.setattr(ms.sdk, "cutout", lambda path, **kw: path)
+
+        def fake_trace(path, **kw):
+            p = tmp_path / "out.svg"
+            p.write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1">'
+                '<rect fill="#DA291C" width="1" height="1"/></svg>',
+                encoding="utf-8",
+            )
+            return str(p)
+
+        monkeypatch.setattr(ms.sdk, "trace", fake_trace)
+
+        data = json.loads(ms.full_pipeline(image_path=str(src), output_dir=str(out)))
+        assert data["success"] is True, data
+        assert os.path.exists(data["zip_path"])
+        with zipfile.ZipFile(data["zip_path"]) as zf:
+            assert "colorflow_gen.png" in set(zf.namelist())
+
+    def test_image_to_prompt_failure_short_circuits(self, monkeypatch, tmp_path):
+        """图→prompt 失败 → 直接返回错误，不生图"""
+        import mcp_server as ms
+
+        src = tmp_path / "src.png"
+        src.write_bytes(_png_bytes())
+
+        def boom(b, **kw):
+            raise PromptError("timeout", "vision slow", retryable=True)
+
+        monkeypatch.setattr(ms, "dispatch_prompt", boom)
+        data = json.loads(ms.full_pipeline(image_path=str(src),
+                                           output_dir=str(tmp_path)))
+        assert data.get("error")
+        assert data["code"] == "timeout"
+        assert data["retryable"] is True
+        assert not os.path.exists(str(tmp_path / "colorflow_pipeline.zip"))
+
+    def test_missing_both_prompt_and_image(self):
+        """prompt 与 image_path 都不给 → 报错"""
+        import mcp_server as ms
+        data = json.loads(ms.full_pipeline())
+        assert data.get("error")
+        assert "至少提供一个" in data["error"]

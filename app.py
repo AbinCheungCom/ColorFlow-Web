@@ -25,6 +25,11 @@ from mcp_print.tools.cost import print_cost_estimate
 from services.color_delta_e import delta_e_cie76
 
 from gen_backends import dispatch as gen_dispatch, available_backends, GenError as GenGenError
+from vision_backends import (
+    dispatch_prompt,
+    available_backends as vision_available_backends,
+    PromptError as GenPromptError,
+)
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB
@@ -1255,6 +1260,99 @@ def gen_jobs_get(job_id):
         # 构造快照（避免前端持有活引用）
         snap = {k: v for k, v in job.items()}
     return jsonify(snap)
+
+
+# ============================================================
+# VISION 图→prompt（Phase 3 · image2prompt 反向闭环）
+# ============================================================
+#
+# 与 /api/generate（prompt→图）对称：上传一张图 → 多模态大模型描述 → 返回
+# 结构化英文 prompt，前端可直接回填到 GEN 提示词框，完成「图→prompt→生图→
+# 描图→Pantone→报价」全闭环（见 docs/03-工作流集成方案.md 方案 B）。
+#
+# 后端：vision_backends.dispatch_prompt（openai / claude / mock，auto 降级）
+
+def _vision_error_response(e):
+    """Vision 错误 → HTTP 响应（与 _gen_error_response 风格一致）"""
+    code_map = {
+        "auth": (401, "未配置 Vision 后端 Key"),
+        "quota": (402, "Vision 后端额度不足"),
+        "timeout": (504, "Vision 后端超时"),
+        "rate_limit": (429, "Vision 后端限流"),
+        "bad_image": (400, "图像无效"),
+        "upstream": (500, "Vision 上游失败"),
+    }
+    status, label = code_map.get(e.code, (500, "Vision 失败"))
+    return jsonify({"error": f"{label}: {e}", "code": e.code, "retryable": e.retryable}), status
+
+
+@app.route("/api/prompt/backends", methods=["GET"])
+def vision_backends_status():
+    """返回已配置的 Vision（图→prompt）后端状态；Key 不回显，仅 available 标志。"""
+    avail = vision_available_backends()
+    all_backends = [
+        {"id": "openai", "label": "OpenAI · gpt-4o（VLM 默认）",
+         "available": "openai" in avail},
+        {"id": "claude", "label": "Anthropic · Claude（备选）",
+         "available": "claude" in avail},
+        {"id": "mock", "label": "本地 mock（零 Key 演示/测试）",
+         "available": "mock" in avail},
+    ]
+    default = os.getenv("VISION_DEFAULT_BACKEND", "auto")
+    any_real = any(b["available"] for b in all_backends if b["id"] != "mock")
+    return jsonify({
+        "success": True,
+        "backends": all_backends,
+        "any_configured": any_real,
+        "default_backend": default,
+    })
+
+
+@app.route("/api/prompt/generate", methods=["POST"])
+def generate_prompt_api():
+    """图→prompt：上传图像 → 多模态大模型描述 → 返回英文 prompt（image2prompt）。
+
+    Form 参数（multipart/form-data）：
+        image   图像文件（必填）PNG/JPG/WebP/BMP
+        backend auto / openai / claude / mock（默认 auto）
+        lang    输出语言 en / zh（默认 en）
+        style   风格提示 product / poster / packaging 等（默认 product）
+        model   覆盖模型名（可选）
+
+    返回：{success, prompt, backend, model, elapsed_ms, meta}
+    """
+    if "image" not in request.files:
+        return jsonify({"error": "未提供图像文件（image）"}), 400
+    f = request.files["image"]
+    if not f.filename:
+        return jsonify({"error": "图像文件名为空"}), 400
+    ctype = f.content_type or "image/png"
+    if ctype not in ALLOWED_CONTENT_TYPES:
+        return jsonify({"error": f"图像类型不支持: {ctype}"}), 415
+    image_bytes = f.read()
+
+    backend = (request.form.get("backend", "auto") or "auto").strip()
+    lang = (request.form.get("lang", "en") or "en").strip()
+    style = (request.form.get("style", "product") or "product").strip()
+    model = (request.form.get("model", "") or "").strip()
+
+    try:
+        t0 = time.time()
+        result = dispatch_prompt(image_bytes, backend=backend, lang=lang,
+                                 style=style, model=model, timeout=120)
+        return jsonify({
+            "success": True,
+            "prompt": result.prompt,
+            "backend": result.backend,
+            "model": result.model,
+            "elapsed_ms": int((time.time() - t0) * 1000),
+            "meta": result.meta,
+        })
+    except GenPromptError as e:
+        return _vision_error_response(e)
+    except Exception as e:
+        logger.exception("generate_prompt_api 图→prompt 失败")
+        return jsonify({"error": f"图→prompt 失败: {e}"}), 500
 
 
 if __name__ == "__main__":

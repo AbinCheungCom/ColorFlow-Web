@@ -661,6 +661,22 @@
                     <img id="genRefPreviewImg" class="preview-img hidden" />
                   </div>
                 </div>
+                <div class="param-row gen-reverse-block">
+                  <label>反向闭环（可选 · 图→prompt）</label>
+                  <div class="upload-zone gen-reverse-zone" id="genReverseZone">
+                    <input type="file" id="genReverseFile" accept="image/*" hidden />
+                    <div class="upload-placeholder">
+                      <svg class="upload-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="40" height="40" aria-hidden="true"><path fill="currentColor" d="M832 288c0-47-38.4-85.344-85.344-85.344s-85.344 38.4-85.344 85.344 38.4 85.344 85.344 85.344 85.344-38.4 85.344-85.344zM512 384c-100.416 0-181.344 73.472-181.344 172.672 0 65.376 36.224 120.032 92.992 152.512v49.536c0 23.488 18.944 42.496 42.352 42.496s42.352-19.008 42.352-42.496v-49.536c56.768-32.48 92.992-87.136 92.992-152.512C693.344 457.472 612.416 384 512 384zm0 256c-47.008 0-85.344-38.336-85.344-85.344S464.992 470.4 512 470.4s85.344 38.336 85.344 85.344S559.008 640 512 640z"/><path fill="currentColor" d="M512 0C229.248 0 0 181.248 0 405.344 0 603.648 268.288 1024 512 1024s512-420.352 512-618.656C1024 181.248 794.752 0 512 0zm0 903.488C260.032 903.488 85.344 574.976 85.344 405.344 85.344 224.448 282.368 85.344 512 85.344s426.656 139.104 426.656 320c0 169.632-174.688 498.144-426.656 498.144z"/></svg>
+                      <div class="upload-text">上传参考图 → 自动提取 prompt</div>
+                      <div class="upload-hint">图→prompt→生图 反向闭环</div>
+                    </div>
+                    <img id="genReversePreviewImg" class="preview-img hidden" />
+                  </div>
+                  <button class="btn btn-secondary btn-small" id="genReverseBtn" disabled>
+                    <span class="btn-text">🔍 提取 prompt</span>
+                    <span class="btn-loader hidden">提取中...</span>
+                  </button>
+                </div>
                 <button class="btn btn-primary" id="genBtn" disabled>
                   <span class="btn-text">✨ 生成效果图</span>
                   <span class="btn-loader hidden">生成中...</span>
