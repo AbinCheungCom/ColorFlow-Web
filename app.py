@@ -21,6 +21,8 @@ from mcp_print.tools.cost import print_cost_estimate
 
 from services.color_delta_e import delta_e_cie76
 
+from gen_backends import dispatch as gen_dispatch, available_backends, GenError as GenGenError
+
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB
 app.config["UPLOAD_FOLDER"] = "/tmp/colorflow-uploads"
@@ -252,7 +254,13 @@ def _strip_white_paths(svg_bytes, tolerance=16):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    resp = render_template("index.html")
+    # no-cache：改版后浏览器不再显示旧页面（开发清单 P1-2.1）
+    return Response(resp, headers={
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    })
 
 
 @app.route("/api/health", methods=["GET"])
@@ -325,16 +333,26 @@ def _trace_svg(image_bytes, image_format, params):
 import threading as _threading
 
 _rembg_sessions: dict = {}
+_rembg_session_errors: dict = {}  # 模型加载失败缓存，避免重复下载
 _rembg_session_lock = _threading.Lock()
 
 
 def _get_rembg_session(model="silueta"):
-    """获取（并缓存）rembg session，按模型名分表缓存，避免每次请求重新加载"""
+    """获取（并缓存）rembg session，按模型名分表缓存，避免每次请求重新加载。
+    模型加载失败时缓存错误，后续请求直接返回错误，不再重试下载。
+    """
     with _rembg_session_lock:
+        if model in _rembg_session_errors:
+            raise _rembg_session_errors[model]
         if model not in _rembg_sessions:
             from rembg import new_session
 
-            _rembg_sessions[model] = new_session(model)
+            try:
+                _rembg_sessions[model] = new_session(model)
+            except Exception as e:
+                # 缓存错误（ValueError: model not supported; ConnectTimeout: 下载超时等）
+                _rembg_session_errors[model] = e
+                raise
     return _rembg_sessions[model]
 
 
@@ -349,16 +367,10 @@ def _rembg_cutout(image_bytes, model="silueta", **kwargs):
     return _bio_open_rgba(result)
 
 
-# rembg 支持的模型（按场景分类，前端用于下拉选择）
+# rembg 支持的模型（保留随包可用 + 已缓存可下载的模型，剔除需下载/需API的模型）
 REMBG_MODELS = [
-    ("silueta", "通用 · 快速 (默认)"),
-    ("u2net", "通用 · 标准"),
-    ("u2net_human_seg", "人像 · 精细"),
-    ("u2netp", "人像 · 快速"),
-    ("dis_anime", "二次元"),
-    ("dis_general_use", "通用 · 高精度"),
-    ("withoutbg", "通用 · 快速高精度"),
-    ("bria-rmbg", "通用 · 高精度 (rembg 推荐)"),
+    ("silueta", "通用 · 快速（默认，已随包附带）"),
+    ("u2net_human_seg", "人像 · 精细（已缓存）"),
 ]
 
 
@@ -432,6 +444,13 @@ def cutout_api():
         )
     except ValidationError as e:
         return jsonify({"error": str(e)}), 400
+    except (ValueError, OSError) as e:
+        err = str(e)
+        if "No session class" in err:
+            return jsonify({"error": f"模型 '{model}' 在当前 rembg 版本中不受支持，请换用 silueta"}), 500
+        if "Invalid argument" in err or "Errno 22" in err:
+            return jsonify({"error": f"模型 '{model}' 加载失败（可能缓存损坏），建议换用 silueta 或重启服务"}), 500
+        return jsonify({"error": err}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -460,6 +479,15 @@ def trace_image():
     except ValidationError as e:
         logger.warning("trace_image 参数校验失败: %s", e)
         return jsonify({"error": str(e)}), 400
+    except (ValueError, OSError) as e:
+        err = str(e)
+        model = request.form.get("model", "silueta").strip() or "silueta"
+        if "No session class" in err:
+            return jsonify({"error": f"模型 '{model}' 在当前 rembg 版本中不受支持，请换用 silueta"}), 500
+        if "Invalid argument" in err or "Errno 22" in err:
+            return jsonify({"error": f"模型 '{model}' 加载失败（可能缓存损坏），建议换用 silueta 或重启服务"}), 500
+        logger.exception("trace_image 描图失败")
+        return jsonify({"error": err}), 500
     except Exception as e:
         logger.exception("trace_image 描图失败（可能导致浏览器 Failed to fetch）")
         return jsonify({"error": f"描图失败: {type(e).__name__}"}), 500
@@ -479,6 +507,14 @@ def trace_colors():
         svg_bytes, _is_cutout = _trace_svg(image_bytes, image_format, params)
     except ValidationError as e:
         return jsonify({"error": str(e)}), 400
+    except (ValueError, OSError) as e:
+        err = str(e)
+        model = request.form.get("model", "silueta").strip() or "silueta"
+        if "No session class" in err:
+            return jsonify({"error": f"模型 '{model}' 在当前 rembg 版本中不受支持，请换用 silueta"}), 500
+        if "Invalid argument" in err or "Errno 22" in err:
+            return jsonify({"error": f"模型 '{model}' 加载失败（可能缓存损坏），建议换用 silueta 或重启服务"}), 500
+        return jsonify({"error": err}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -965,6 +1001,120 @@ def restart_service():
         })
     except Exception as e:
         return jsonify({"error": f"重启失败: {e}"}), 500
+
+
+# ============================================================
+# AI 生图（GEN 适配器层 · Phase 1 同步版）
+# ============================================================
+#
+# 见《ColorFlow 开发文档 02 · 生图适配器（GEN · 路线 A）》。
+# 零本地 GPU：调用云端图像大模型 API，本地仅做 Pillow 格式转码。
+# 失败可降级：backend=auto 时按 volcano → fal → comfyui 优先级探测，
+# retryable 失败自动降级到下一后端，绝不假成功。
+
+
+def _gen_error_response(e: GenGenError):
+    """GenError → HTTP 响应，沿用现有错误码体系 + 文档 02 §4.1 补充"""
+    code_map = {
+        "bad_prompt": (400, "生成描述无效"),
+        "auth": (401, "GEN not configured"),
+        "quota": (402, "后端额度不足"),
+        "timeout": (504, "生成超时"),
+        "rate_limit": (429, "请求过频"),
+        "upstream": (500, "上游生成失败"),
+    }
+    status, label = code_map.get(e.code, (500, "生成失败"))
+    return jsonify({
+        "error": f"{label}: {e}",
+        "code": e.code,
+        "retryable": e.retryable,
+    }), status
+
+
+@app.route("/api/generate/backends", methods=["GET"])
+def gen_backends_status():
+    """返回已配置的生图后端状态（Key 不回显，仅 available 标志）"""
+    avail = available_backends()
+    all_backends = [
+        {"id": "volcano", "label": "火山方舟 · 即梦 Seedream（国内默认）",
+         "available": "volcano" in avail},
+        {"id": "fal", "label": "fal.ai（海外 · 模型最全）",
+         "available": "fal" in avail},
+        {"id": "comfyui", "label": "本地 ComfyUI（可选装）",
+         "available": "comfyui" in avail},
+    ]
+    default = os.getenv("GEN_DEFAULT_BACKEND", "auto")
+    return jsonify({
+        "success": True,
+        "backends": all_backends,
+        "any_configured": len(avail) > 0,
+        "default_backend": default,
+    })
+
+
+@app.route("/api/generate", methods=["POST"])
+def generate_image_api():
+    """AI 生图：prompt → 云端图像大模型 → PNG（base64）
+
+    Form 参数（multipart/form-data，与 /api/trace 风格一致）：
+        prompt      生图描述（必填，中文/英文均可）
+        backend     auto / volcano / fal / comfyui（默认 auto）
+        ref_image   参考图（可选，图生图）PNG/JPG/WebP/BMP
+        size        输出尺寸，如 1024x1024（默认 1024x1024）
+        n           生成张数 1-4（默认 1）
+        model       覆盖模型名（可选）
+    """
+    prompt = (request.form.get("prompt", "") or "").strip()
+    if not prompt:
+        return jsonify({"error": "prompt 不能为空"}), 400
+
+    backend = (request.form.get("backend", "auto") or "auto").strip()
+    size = (request.form.get("size", "1024x1024") or "1024x1024").strip()
+    try:
+        n = max(1, min(int(request.form.get("n", "1") or "1"), 4))
+    except (TypeError, ValueError):
+        n = 1
+    model = (request.form.get("model", "") or "").strip()
+
+    # 参考图校验（复用图片类型白名单 + 大小上限）
+    ref_bytes = None
+    if "ref_image" in request.files and request.files["ref_image"].filename:
+        rf = request.files["ref_image"]
+        ctype = rf.content_type or "image/png"
+        if ctype not in ALLOWED_CONTENT_TYPES:
+            return jsonify({"error": f"参考图类型不支持: {ctype}"}), 415
+        ref_bytes = rf.read()
+
+    try:
+        import time as _time
+
+        t0 = _time.time()
+        results = gen_dispatch(
+            prompt, ref_image=ref_bytes, backend=backend,
+            size=size, n=n, model=model,
+        )
+        elapsed_ms = int((_time.time() - t0) * 1000)
+        images = []
+        for r in results:
+            images.append({
+                "png_base64": base64.b64encode(r.png_bytes).decode("utf-8"),
+                "width": r.width,
+                "height": r.height,
+                "backend": r.backend,
+                "model": r.model,
+                "meta": r.meta,
+            })
+        return jsonify({
+            "success": True,
+            "images": images,
+            "count": len(images),
+            "elapsed_ms": elapsed_ms,
+        })
+    except GenGenError as e:
+        return _gen_error_response(e)
+    except Exception as e:
+        logger.exception("generate_image_api 生图失败")
+        return jsonify({"error": f"生图失败: {e}"}), 500
 
 
 if __name__ == "__main__":

@@ -39,6 +39,8 @@ from colorflow_keys import keystore
 
 from services.color_delta_e import delta_e_cie76
 
+from gen_backends import dispatch as gen_dispatch, GenError as GenGenError
+
 mcp = FastMCP("ColorFlow")
 
 
@@ -743,6 +745,83 @@ def export_pantone_pdf(
         return json.dumps({"error": str(e)}, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": f"导出失败: {e}"}, ensure_ascii=False)
+
+
+# ============================================================
+# AI 生图（GEN 适配器层）— 零本地 GPU，调用云端图像大模型
+# ============================================================
+
+
+@mcp.tool()
+def generate_image(
+    prompt: str,
+    backend: str = "auto",
+    ref_image_path: str = None,
+    size: str = "1024x1024",
+    n: int = 1,
+    model: str = "",
+    output_dir: str = "/tmp/colorflow-gen",
+) -> str:
+    """AI 生成包装效果图（零本地 GPU，调用云端图像大模型）。
+
+    Args:
+        prompt: 生图描述（中文/英文均可），如"红色天地盖礼盒，烫金logo，哑光，电商白底"
+        backend: auto / volcano / fal / comfyui（默认 auto，按优先级降级）
+        ref_image_path: 参考图路径（可选，图生图），PNG/JPG/WebP/BMP
+        size: 输出尺寸，如 "1024x1024"
+        n: 生成张数 1-4（默认 1）
+        model: 覆盖模型名（空则用各后端默认）
+        output_dir: 输出目录（默认 /tmp/colorflow-gen）
+    Returns:
+        JSON: {success, images: [{png_path, width, height, backend, model}],
+               backend, count}
+        生成的 PNG 路径可直接传给 trace_image / cutout 使用。
+    """
+    auth = _auth_check()
+    if auth:
+        return auth
+    if not prompt or not prompt.strip():
+        return json.dumps({"error": "prompt 不能为空"}, ensure_ascii=False)
+    ref_bytes = None
+    if ref_image_path:
+        if not os.path.exists(ref_image_path):
+            return json.dumps({"error": f"参考图不存在: {ref_image_path}"}, ensure_ascii=False)
+        with open(ref_image_path, "rb") as f:
+            ref_bytes = f.read()
+    try:
+        results = gen_dispatch(
+            prompt, ref_image=ref_bytes, backend=backend,
+            size=size, n=n, model=model,
+        )
+    except GenGenError as e:
+        return json.dumps(
+            {"error": f"生图失败({e.code}): {e}", "code": e.code, "retryable": e.retryable},
+            ensure_ascii=False,
+        )
+
+    import tempfile
+
+    os.makedirs(output_dir, exist_ok=True)
+    images = []
+    for idx, r in enumerate(results):
+        prefix = r.backend or "gen"
+        with tempfile.NamedTemporaryFile(
+            prefix=f"{prefix}_{idx}_", suffix=".png", dir=output_dir, delete=False
+        ) as tmp:
+            tmp.write(r.png_bytes)
+            png_path = tmp.name
+        images.append({
+            "png_path": png_path,
+            "width": r.width,
+            "height": r.height,
+            "backend": r.backend,
+            "model": r.model,
+        })
+    return json.dumps(
+        {"success": True, "images": images, "count": len(images),
+         "backend": results[0].backend if results else ""},
+        ensure_ascii=False,
+    )
 
 
 if __name__ == "__main__":

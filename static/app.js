@@ -191,6 +191,7 @@ function openSettingsModal() {
   settingsModal.classList.add('open');
   loadKeyList();
   updateMcpConfig();
+  loadGenBackends();
 }
 function closeSettingsModal() {
   settingsModal.classList.remove('open');
@@ -1033,3 +1034,202 @@ g3dDownload.addEventListener('click', () => {
   a.download = 'colorflow_3d_greyscale.png';
   a.click();
 });
+
+// ============================================================
+// AI 生图（GEN 适配器层）
+// ============================================================
+const genPrompt = document.getElementById('genPrompt');
+const genBackend = document.getElementById('genBackend');
+const genN = document.getElementById('genN');
+const genSize = document.getElementById('genSize');
+const genBtn = document.getElementById('genBtn');
+const genResults = document.getElementById('genResults');
+const genHint = document.getElementById('genHint');
+const genRefZone = document.getElementById('genRefZone');
+const genRefFile = document.getElementById('genRefFile');
+const genRefPreviewImg = document.getElementById('genRefPreviewImg');
+
+let genRefFileObj = null;
+let genResultsData = [];   // [{png_base64, width, height, backend, model}]
+
+// prompt 非空即启用生成按钮
+if (genPrompt) {
+  genPrompt.addEventListener('input', () => {
+    genBtn.disabled = !genPrompt.value.trim();
+  });
+}
+
+// 参考图上传区
+if (genRefZone) {
+  genRefZone.addEventListener('click', () => genRefFile.click());
+  genRefZone.addEventListener('dragover', e => { e.preventDefault(); genRefZone.classList.add('dragover'); });
+  genRefZone.addEventListener('dragleave', () => genRefZone.classList.remove('dragover'));
+  genRefZone.addEventListener('drop', e => {
+    e.preventDefault();
+    genRefZone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) handleGenRefFile(e.dataTransfer.files[0]);
+  });
+  genRefFile.addEventListener('change', e => {
+    if (e.target.files[0]) handleGenRefFile(e.target.files[0]);
+  });
+}
+
+function handleGenRefFile(file) {
+  if (!file.type.startsWith('image/')) { alert('请上传图片文件'); return; }
+  if (file.size > 10 * 1024 * 1024) { alert('图片不能超过 10MB'); return; }
+  genRefFileObj = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    genRefPreviewImg.src = e.target.result;
+    genRefPreviewImg.classList.remove('hidden');
+    genRefZone.querySelector('.upload-placeholder').classList.add('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+
+// 后端状态面板（设置页 nav-gen）
+async function loadGenBackends() {
+  const list = document.getElementById('genBackendsList');
+  if (!list) return;
+  try {
+    const resp = await apiFetch('/api/generate/backends');
+    const data = await resp.json();
+    if (!data.success) { list.innerHTML = '<div class="key-empty">加载失败</div>'; return; }
+    if (!data.any_configured) {
+      list.innerHTML = '<div class="key-empty">未配置任何生图后端 Key · 请设置环境变量后重启</div>';
+      return;
+    }
+    list.innerHTML = data.backends.map(b => {
+      const dot = b.available ? '✅' : '❌';
+      return `<div class="gen-backend-row"><span class="gen-backend-dot">${dot}</span>
+        <span class="gen-backend-label">${escapeHtml(b.label)}</span></div>`;
+    }).join('');
+    // 默认后端下拉同步
+    if (data.default_backend && genBackend) genBackend.value = data.default_backend;
+  } catch (e) {
+    list.innerHTML = '<div class="key-empty">加载失败</div>';
+  }
+}
+
+// base64 → Blob
+function genBase64ToBlob(b64, type = 'image/png') {
+  const bin = atob(b64);
+  const len = bin.length;
+  const arr = new Uint8Array(len);
+  for (let i = 0; i < len; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type });
+}
+
+// 送流水线：把生成图注入描图 Tab（DataTransfer 注入 file input）
+function genInjectToTrace(b64, mode) {
+  const traceTab = document.querySelector('.tab[data-tab="trace"]');
+  if (traceTab) traceTab.click();
+  const blob = genBase64ToBlob(b64);
+  const file = new File([blob], 'colorflow_generated.png', { type: 'image/png' });
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  const traceFileEl = document.getElementById('traceFile');
+  if (traceFileEl && dt.files) {
+    traceFileEl.files = dt.files;
+    if (typeof handleFile === 'function') handleFile(file);
+  }
+  if (mode) {
+    const traceModeEl = document.getElementById('traceMode');
+    if (traceModeEl) {
+      traceModeEl.value = mode;
+      if (typeof syncTraceMode === 'function') syncTraceMode();
+    }
+  }
+}
+
+// 生成
+if (genBtn) {
+  genBtn.addEventListener('click', async () => {
+    const prompt = genPrompt.value.trim();
+    if (!prompt) return;
+    genBtn.disabled = true;
+    genBtn.querySelector('.btn-text').classList.add('hidden');
+    genBtn.querySelector('.btn-loader').classList.remove('hidden');
+    genResults.innerHTML = '<div class="svg-placeholder">生成中，通常 10–60 秒...</div>';
+    genHint.textContent = '生成图为灵感稿，印刷请走右侧生产链路';
+
+    const formData = new FormData();
+    formData.append('prompt', prompt);
+    formData.append('backend', genBackend.value);
+    formData.append('n', genN.value);
+    formData.append('size', genSize.value);
+    if (genRefFileObj) formData.append('ref_image', genRefFileObj);
+
+    try {
+      const resp = await apiFetch('/api/generate', { method: 'POST', body: formData });
+      const data = await resp.json();
+      if (data.success && data.images && data.images.length > 0) {
+        genResultsData = data.images;
+        renderGenResults(data.images, data.elapsed_ms);
+      } else {
+        const hint = data.retryable ? '（可重试或更换后端）' : '';
+        genResults.innerHTML = `<div class="svg-placeholder" style="color:var(--error)">错误: ${escapeHtml(data.error || '生成失败')} ${hint}</div>`;
+      }
+    } catch (e) {
+      genResults.innerHTML = `<div class="svg-placeholder" style="color:var(--error)">请求失败: ${escapeHtml(fetchErrorMessage(e))}</div>`;
+    } finally {
+      genBtn.disabled = false;
+      genBtn.querySelector('.btn-text').classList.remove('hidden');
+      genBtn.querySelector('.btn-loader').classList.add('hidden');
+    }
+  });
+}
+
+function renderGenResults(images, elapsedMs) {
+  let html = `<div class="gen-results-meta">${images.length} 张 · ${elapsed_ms_label(elapsedMs)}</div>`;
+  html += '<div class="gen-grid">';
+  images.forEach((img, idx) => {
+    const meta = `${escapeHtml(img.backend)} · ${escapeHtml(img.model || '-')} · ${img.width}×${img.height}`;
+    html += `<div class="gen-card" data-idx="${idx}">
+      <img src="data:image/png;base64,${img.png_base64}" class="gen-thumb" alt="生成图 ${idx + 1}"/>
+      <div class="gen-card-meta">${meta}</div>
+      <div class="gen-card-actions">
+        <button class="btn btn-small" data-act="download">下载 PNG</button>
+        <button class="btn btn-small" data-act="cutout-trace">抠图+描图</button>
+        <button class="btn btn-small btn-accent" data-act="palette">提取主色&Pantone</button>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  genResults.innerHTML = html;
+}
+
+function elapsed_ms_label(ms) {
+  if (ms == null) return '';
+  if (ms < 1000) return ms + ' ms';
+  return (ms / 1000).toFixed(1) + ' s';
+}
+
+// 结果区按钮事件委托
+if (genResults) {
+  genResults.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const card = btn.closest('.gen-card');
+    const idx = Number(card.dataset.idx);
+    const img = genResultsData[idx];
+    if (!img) return;
+    const act = btn.dataset.act;
+    if (act === 'download') {
+      const a = document.createElement('a');
+      a.href = 'data:image/png;base64,' + img.png_base64;
+      a.download = `colorflow_gen_${idx + 1}.png`;
+      a.click();
+    } else if (act === 'cutout-trace') {
+      // 抠图+描图：注入描图 Tab 并切到 cutout 模式（rembg 抠图后描图，输出透明 SVG）
+      genInjectToTrace(img.png_base64, 'cutout');
+    } else if (act === 'palette') {
+      // 提取主色：注入描图 Tab 并自动触发一键流水线
+      genInjectToTrace(img.png_base64, 'color');
+      setTimeout(() => {
+        const cmb = document.getElementById('colorMatchBtn');
+        if (cmb) cmb.click();
+      }, 300);
+    }
+  });
+}

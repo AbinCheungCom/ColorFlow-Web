@@ -84,6 +84,10 @@
           <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 14L14.5 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/><rect x="1.5" y="6" width="4" height="8" fill="currentColor"/><rect x="6" y="4" width="4" height="10" fill="currentColor" opacity="0.6"/><rect x="10.5" y="2" width="4" height="12" fill="currentColor" opacity="0.35"/></svg>
           3D 灰度图
         </button>
+        <button class="tab" data-tab="generate">
+          <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.8 4.2 4.2.3-3.3 2.7 1.1 4.1L8 11.5 4.2 13.4l1.1-4.1L2 6.6l4.2-.3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+          AI 生图
+        </button>
       </nav>
 
       <footer class="sidebar-footer">
@@ -120,6 +124,10 @@
               <button class="settings-nav-item" data-nav="mcp">
                 <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2h10v4H3zM3 8h4v4H3zM9 8h4v4H9z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
                 MCP 接入
+              </button>
+              <button class="settings-nav-item" data-nav="gen">
+                <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.8 4.2 4.2.3-3.3 2.7 1.1 4.1L8 11.5 4.2 13.4l1.1-4.1L2 6.6l4.2-.3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+                生图后端
               </button>
             </div>
           </nav>
@@ -173,7 +181,7 @@
                 <button class="btn btn-small btn-primary" id="copyMcpConfigBtn">复制配置</button>
               </div>
               <div class="settings-section">
-                <p class="settings-desc">可用工具（11 个）</p>
+                <p class="settings-desc">可用工具（12 个）</p>
                 <div class="mcp-tools-list">
                   <span class="mcp-tool-tag">trace_image</span>
                   <span class="mcp-tool-tag">cutout</span>
@@ -185,6 +193,24 @@
                   <span class="mcp-tool-tag">export_print</span>
                   <span class="mcp-tool-tag">quote_print</span>
                   <span class="mcp-tool-tag">greyscale3d</span>
+                  <span class="mcp-tool-tag">export_pantone_pdf</span>
+                  <span class="mcp-tool-tag">generate_image</span>
+                </div>
+              </div>
+            </div>
+            <div class="settings-page" id="nav-gen">
+              <div class="settings-section">
+                <p class="settings-desc">生图后端按 Key 自动发现，backend=auto 按优先级降级</p>
+                <div class="gen-backends-list" id="genBackendsList">
+                  <div class="key-empty">加载中...</div>
+                </div>
+              </div>
+              <div class="settings-section">
+                <p class="settings-desc">配置环境变量后重启服务生效（Key 仅存服务端，不进前端）</p>
+                <div class="gen-env-hint">
+                  <code>VOLCANO_API_KEY</code> · 火山方舟（国内默认）<br/>
+                  <code>FAL_KEY</code> · fal.ai（海外）<br/>
+                  <code>COMFYUI_URL</code> · 本地 ComfyUI（可选装）
                 </div>
               </div>
             </div>
@@ -219,13 +245,7 @@
                     <label>抠图模型</label>
                     <select id="cutoutModel">
                       <option value="silueta">通用快速（默认）</option>
-                      <option value="u2net">通用标准</option>
                       <option value="u2net_human_seg">人像精细</option>
-                      <option value="u2netp">人像快速</option>
-                      <option value="dis_anime">二次元</option>
-                      <option value="dis_general_use">通用高精度</option>
-                      <option value="withoutbg">通用快速高精度</option>
-                      <option value="bria-rmbg">通用高精细</option>
                     </select>
                   </div>
                   <div class="param-row param-row-checkbox">
@@ -373,13 +393,7 @@
                       <label>抠图模型</label>
                       <select id="traceCutoutModel">
                         <option value="silueta">通用快速（默认）</option>
-                        <option value="u2net">通用标准</option>
                         <option value="u2net_human_seg">人像精细</option>
-                        <option value="u2netp">人像快速</option>
-                        <option value="dis_anime">二次元</option>
-                        <option value="dis_general_use">通用高精度</option>
-                        <option value="withoutbg">通用快速高精度</option>
-                        <option value="bria-rmbg">通用高精细</option>
                       </select>
                     </div>
                     <div class="param-row param-row-checkbox">
@@ -587,6 +601,74 @@
                     <span>128 (灰)</span>
                     <span>255 (白)</span>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab: AI 生图（GEN 适配器层） -->
+        <section class="tab-content" id="tab-generate">
+          <div class="card">
+            <div class="card-header">
+              <h2>AI 生图</h2>
+              <p class="card-desc">输入一句话生成包装效果图，零本地 GPU，直接送下游印刷链路</p>
+            </div>
+            <div class="gen-layout">
+              <div class="gen-input">
+                <div class="param-row">
+                  <label>生图描述</label>
+                  <textarea id="genPrompt" class="gen-prompt-input" rows="3" placeholder="红色天地盖礼盒，烫金logo，哑光材质，电商白底"></textarea>
+                </div>
+                <div class="gen-opts">
+                  <div class="param-row">
+                    <label>后端</label>
+                    <select id="genBackend">
+                      <option value="auto">自动（按优先级降级）</option>
+                      <option value="volcano">火山方舟 · 即梦</option>
+                      <option value="fal">fal.ai</option>
+                      <option value="comfyui">本地 ComfyUI</option>
+                    </select>
+                  </div>
+                  <div class="param-row">
+                    <label>张数</label>
+                    <select id="genN">
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                    </select>
+                  </div>
+                  <div class="param-row">
+                    <label>尺寸</label>
+                    <select id="genSize">
+                      <option value="1024x1024">1024×1024</option>
+                      <option value="1024x1536">1024×1536</option>
+                      <option value="1536x1024">1536×1024</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="param-row">
+                  <label>参考图（可选 · 图生图）</label>
+                  <div class="upload-zone gen-ref-zone" id="genRefZone">
+                    <input type="file" id="genRefFile" accept="image/*" hidden />
+                    <div class="upload-placeholder">
+                      <svg class="upload-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="40" height="40" aria-hidden="true"><path fill="currentColor" d="M853.344 341.344C853.344 294.4 814.944 256 768 256s-85.344 38.4-85.344 85.344 38.4 85.344 85.344 85.344 85.344-38.4 85.344-85.344z"/><path fill="currentColor" d="M0 85.344v853.344h512v-85.344H85.344V742.4l256-256L512 657.056l59.744-59.744-230.4-230.4-256 256V170.656h853.344v298.656l85.344 85.344V85.312z"/></svg>
+                      <div class="upload-text">点击上传或拖拽参考图</div>
+                      <div class="upload-hint">PNG / JPG / WebP · 最大 10MB</div>
+                    </div>
+                    <img id="genRefPreviewImg" class="preview-img hidden" />
+                  </div>
+                </div>
+                <button class="btn btn-primary" id="genBtn" disabled>
+                  <span class="btn-text">✨ 生成效果图</span>
+                  <span class="btn-loader hidden">生成中...</span>
+                </button>
+                <p class="gen-hint" id="genHint">生成图为灵感稿，印刷请走右侧生产链路</p>
+              </div>
+              <div class="gen-output">
+                <div class="gen-results" id="genResults">
+                  <div class="svg-placeholder">等待生成...</div>
                 </div>
               </div>
             </div>

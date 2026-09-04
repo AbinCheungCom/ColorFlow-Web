@@ -623,3 +623,117 @@ class TestPantoneExport:
             assert r.data[:5] == b"%PDF-"
         finally:
             keystore.revoke(kid)
+
+
+# ============================================================
+# 抠图 / 忽略白色 / mode=cutout（开发清单 P2-3.1 补全）
+# ============================================================
+
+def _synth_png_bytes(size=64):
+    """合成一张彩色 PNG（红圆 + 白底），供 cutout/trace 测试，无需外部 sample。
+
+    64×64 足以让 rembg 与 VTracer 正常处理，又不会拖慢测试。
+    """
+    from PIL import Image, ImageDraw
+
+    img = Image.new("RGB", (size, size), (255, 255, 255))
+    d = ImageDraw.Draw(img)
+    d.ellipse([size * 0.2, size * 0.2, size * 0.8, size * 0.8], fill=(220, 40, 40))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+class TestCutout:
+    """位图抠图端点（/api/cutout → 透明 PNG）"""
+
+    def test_no_image(self):
+        resp = client.post("/api/cutout", data={})
+        assert resp.status_code == 400
+
+    def test_empty_filename(self):
+        resp = client.post(
+            "/api/cutout",
+            data={"image": (io.BytesIO(b"x"), "")},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 400
+
+    def test_unsupported_content_type(self):
+        resp = client.post(
+            "/api/cutout",
+            data={"image": (io.BytesIO(b"GIF89a"), "a.gif")},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 415
+
+    def test_invalid_model_falls_back(self):
+        """非法模型名应回退 silueta 而非 500"""
+        png = _synth_png_bytes()
+        resp = client.post(
+            "/api/cutout",
+            data={"image": (io.BytesIO(png), "synth.png"), "model": "nonexistent-model"},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["success"] is True
+        assert data["png_base64"]
+        assert data["width"] > 0 and data["height"] > 0
+        assert data["model"] == "silueta"  # 回退默认
+
+    def test_success(self):
+        png = _synth_png_bytes()
+        resp = client.post(
+            "/api/cutout",
+            data={"image": (io.BytesIO(png), "synth.png")},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["success"] is True
+        assert data["png_base64"]
+        assert data["size"] > 0
+        assert data["width"] > 0 and data["height"] > 0
+
+
+class TestTraceIgnoreWhite:
+    """忽略白色 / mode=cutout（输出透明背景 SVG）"""
+
+    def test_ignore_white_success(self):
+        png = _synth_png_bytes()
+        resp = client.post(
+            "/api/trace",
+            data={"image": (io.BytesIO(png), "synth.png"), "ignore_white": "1"},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["success"] is True
+        assert data["svg_base64"]
+
+    def test_mode_cutout_success(self):
+        """mode=cutout 走 rembg 抠图 + 描图，输出透明底 SVG"""
+        png = _synth_png_bytes()
+        resp = client.post(
+            "/api/trace",
+            data={"image": (io.BytesIO(png), "synth.png"), "mode": "cutout"},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["success"] is True
+        assert data["svg_base64"]
+
+    def test_mode_cutout_then_colors(self):
+        """mode=cutout + 一键流水线：抠图→描图→主色→Pantone"""
+        png = _synth_png_bytes()
+        resp = client.post(
+            "/api/trace/colors",
+            data={"image": (io.BytesIO(png), "synth.png"), "mode": "cutout"},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["success"] is True
+        assert data["svg_base64"]

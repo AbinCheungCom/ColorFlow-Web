@@ -1199,3 +1199,144 @@ body {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   letter-spacing: 0.4px;
 }
+
+/* ============================================================
+   AI 生图（GEN 适配器层）
+   ============================================================ */
+.gen-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .gen-layout { grid-template-columns: 1fr; }
+}
+.gen-input { display: flex; flex-direction: column; gap: 12px; }
+.gen-prompt-input {
+  width: 100%;
+  min-height: 84px;
+  padding: 12px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.gen-prompt-input:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+.gen-opts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+@media (max-width: 560px) {
+  .gen-opts { grid-template-columns: 1fr; }
+}
+.gen-ref-zone {
+  min-height: 96px;
+}
+.gen-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: 0.3px;
+  margin-top: 2px;
+}
+.gen-output {
+  min-height: 240px;
+}
+.gen-results {
+  min-height: 240px;
+}
+.gen-results-meta {
+  font-size: 12px;
+  font-weight: 540;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  margin-bottom: 12px;
+  letter-spacing: 0.4px;
+}
+.gen-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+.gen-card {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface-soft);
+}
+.gen-thumb {
+  width: 100%;
+  height: 180px;
+  object-fit: contain;
+  background: var(--canvas);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--hairline-soft);
+}
+.gen-card-meta {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: 0.3px;
+}
+.gen-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.gen-card-actions .btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  padding: 6px 10px;
+}
+
+/* 设置页 — 生图后端状态 */
+.gen-backends-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gen-backend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--canvas);
+  font-size: 13px;
+}
+.gen-backend-dot { font-size: 14px; }
+.gen-backend-label { color: var(--ink); }
+.gen-env-hint {
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  padding: 12px;
+  background: var(--surface-soft);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--hairline-soft);
+}
+.gen-env-hint code {
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  color: var(--ink);
+  font-size: 11px;
+}

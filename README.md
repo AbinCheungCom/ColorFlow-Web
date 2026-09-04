@@ -25,7 +25,8 @@ ColorFlow Web 是 **ColorFlow 矢量描图 SDK** 和 **Pantone 色彩管理** �
 | **API Key 管理** | 设置页一键生成 / 撤销 Key，Web API 与 MCP 共用 |
 | **3D 灰度图** | 彩色位图 → 灰度高度图 / 位移贴图（8/16-bit），用于 3D 建模（Blender / 3D 打印 / 深度通道）+ 实时直方图 |
 | **服务重启** | 设置页「重启服务」按钮一键重启 Flask 实例 |
-| **AI Agent 接入** | 内置 MCP Server（11 工具），Claude Code / Cursor 可直接调用 |
+| **AI 生图** | 一句话生成包装效果图（火山方舟 / fal.ai / ComfyUI 三后端 auto 降级，零本地 GPU），生成图直接送抠图 / 描图 / Pantone 流水线 |
+| **AI Agent 接入** | 内置 MCP Server（12 工具），Claude Code / Cursor 可直接调用 |
 
 ## 技术栈
 
@@ -75,6 +76,43 @@ start.bat
   ```
   https://gh.ddlc.top/https://github.com/danielgatis/rembg/releases/download/v0.0.0/silueta.onnx
   ```
+
+## AI 生图（GEN 适配器层）
+
+一句话生成包装效果图，**零本地 GPU**（调用云端图像大模型 API，本地仅做 Pillow 格式转码）。生成的 PNG 可直接送下游抠图 / 描图 / Pantone 流水线。
+
+### 后端（按优先级 auto 降级）
+
+| 后端 | 环境变量 | 说明 |
+|------|---------|------|
+| volcano | `VOLCANO_API_KEY` | 火山方舟 / 即梦 Seedream（国内默认） |
+| fal | `FAL_KEY` | fal.ai 队列（海外，Flux/Seedream 等） |
+| comfyui | `COMFYUI_URL` | 本地 ComfyUI `/prompt` 轮询（可选装） |
+
+配置一个或多个环境变量后重启服务生效，设置页「生图后端」标签显示各后端可用性。`backend=auto` 时按 `volcano → fal → comfyui` 探测，失败且 `retryable` 自动降级到下一后端，绝不假成功。
+
+### 可选环境变量
+
+```bash
+export GEN_DEFAULT_BACKEND=auto   # 默认后端（auto/volcano/fal/comfyui）
+export GEN_TIMEOUT=120            # 超时秒数
+export GEN_MAX_IMAGES=4           # 单次最多张数
+```
+
+### 示例
+
+```bash
+# AI 生图 → PNG（base64）
+curl -X POST http://localhost:5000/api/generate \
+  -F "prompt=红色天地盖礼盒，烫金logo，哑光，电商白底" \
+  -F "backend=auto" \
+  -F "size=1024x1024"
+
+# 查看已配置的生图后端
+curl http://localhost:5000/api/generate/backends
+```
+
+> 生成图为灵感稿，印刷请走右侧生产链路。无后端 Key 时返回 401 明确提示。
 
 ## API Key 管理
 
@@ -156,7 +194,7 @@ curl -X POST http://localhost:5000/api/restart
 }
 ```
 
-### 可用工具（11 个）
+### 可用工具（12 个）
 
 | Tool | 说明 | 关键参数 |
 |------|------|---------|
@@ -169,8 +207,9 @@ curl -X POST http://localhost:5000/api/restart
 | `pantone_colors` | Pantone 色库分页 + 搜索 | page, limit, search |
 | `quote_print` | 印刷全链路报价 | width, height, qty, colors, gsm, method |
 | `export_print` | 位图 → 印刷级 CMYK PDF | width_mm, height_mm, bleed_mm, mode |
-| `export_pantone_pdf` | 色卡 / 匹配报告 PDF | export_type（swatch / report）, 颜色数据 |
+| `export_pantone_pdf` | 色卡 / 匹配报告 PDF | export_type（swatch / report / palette）, 颜色数据 |
 | `greyscale3d` | 位图 → 3D 灰度高度图 / 位移贴图 | invert, contrast, gamma, smooth, auto_levels, bit_depth |
+| `generate_image` | AI 生成包装效果图（零本地 GPU）| prompt, backend（auto 降级）, ref_image_path, size, n |
 
 ### Agent 调用示例
 
@@ -196,6 +235,11 @@ Agent: 调用 export_pantone_pdf(export_type="swatch", name="485 C",
 Agent: 调用 greyscale3d("D:/object.jpg", invert=True, contrast=1.5, gamma=0.9,
          smooth=1, auto_levels=True, bit_depth=16)
    → {success, png_path, width, height, bit_depth}
+
+用户: 「生成一个红色天地盖礼盒效果图，然后描成矢量」
+Agent: 调用 generate_image("红色天地盖礼盒，烫金logo，哑光，电商白底")
+  → {success, images: [{png_path, width, height, backend: "volcano"}]}
+  再调 trace_image(png_path) → SVG 路径
 ```
 
 ## API 接口
@@ -212,6 +256,8 @@ Agent: 调用 greyscale3d("D:/object.jpg", invert=True, contrast=1.5, gamma=0.9,
 | `POST` | `/api/print/export` | 位图 → 印刷级 CMYK PDF 下载 |
 | `POST` | `/api/pantone/export` | 色卡 / 匹配报告 PDF（CMYK）|
 | `POST` | `/api/grayscale3d` | 位图 → 3D 灰度高度图 / 位移贴图（8/16-bit PNG）|
+| `POST` | `/api/generate` | AI 生图 → PNG（base64），backend=auto 按优先级降级 |
+| `GET` | `/api/generate/backends` | 生图后端状态（volcano/fal/comfyui 可用性）|
 | `POST` | `/api/restart` | 触发服务重启（异步启动 restart.ps1）|
 | `POST` | `/api/keys/generate` | 生成新 API Key |
 | `GET` | `/api/keys` | 列出所有 Key（脱敏）|
@@ -319,21 +365,26 @@ curl -X POST http://localhost:5000/api/restart
 
 ```
 colorflow-web/
-├── app.py               # Flask 入口，所有 API 路由 + Key 管理端点 + 3D 灰度图 + 服务重启
+├── app.py               # Flask 入口，所有 API 路由 + Key 管理端点 + 3D 灰度图 + AI 生图 + 服务重启
+├── gen_backends.py      # GEN 生图适配器层（volcano / fal / comfyui + auto 降级 + GenResult/GenError）
 ├── colorflow_keys.py    # KeyStore：API Key 生成 / 校验 / 撤销
-├── mcp_server.py        # MCP Server（11 工具 + Key 认证）
+├── mcp_server.py        # MCP Server（12 工具 + Key 认证）
 ├── restart.ps1          # 服务重启脚本（杀旧进程 + 拉起新实例）
 ├── templates/
-│   └── index.html      # 单页（抠图 / 描图 / Pantone / 色彩匹配 / 3D 灰度图 + 设置页）
+│   └── index.html      # 单页（抠图 / 描图 / Pantone / 色彩匹配 / 3D 灰度图 / AI 生图 + 设置页）
 ├── static/
 │   ├── style.css       # Figma DESIGN.md 样式
-│   ├── app.js          # 前端交互 + Key 管理 + MCP 配置 + 3D 灰度图
+│   ├── app.js          # 前端交互 + Key 管理 + MCP 配置 + 3D 灰度图 + AI 生图
 │   └── favicon.*       # 浏览器图标（ico/png/svg/manifest）
+├── assets/
+│   └── gen_workflow_api.json  # ComfyUI 文生图工作流模板（可替换本机构造）
 ├── models/
 │   └── silueta.onnx    # 抠图模型（42MB，随包附带）
 ├── tests/
-│   ├── test_app.py     # API 集成测试 + Key 管理测试 + 3D 灰度图测试
-│   └── test_mcp.py     # MCP Server 全工具测试
+│   ├── conftest.py     # 共享配置（U2NET_HOME 回退包内模型）
+│   ├── test_app.py     # API 集成测试 + Key 管理 + 3D 灰度图 + 抠图/忽略白色
+│   ├── test_mcp.py     # MCP Server 全工具测试
+│   └── test_gen.py     # GEN 生图适配器（mock 后端 + auto 降级）
 ├── start.bat           # Windows 一键启动
 ├── DEPLOY.md           # 部署说明
 └── requirements.txt    # 依赖清单
@@ -343,7 +394,7 @@ colorflow-web/
 
 ```bash
 pip install pytest
-python -m pytest tests/ -q     # 67 个用例
+python -m pytest tests/ -q     # 117 个用例
 ```
 
 ## 相关项目
