@@ -1142,7 +1142,53 @@ function genInjectToTrace(b64, mode) {
   }
 }
 
-// 生成
+// 生成（任务模式：POST /api/generate/jobs → 轮询 GET /api/generate/jobs/{id}）
+const GEN_POLL_INTERVAL = 2000;      // 轮询间隔 2s
+const GEN_POLL_TIMEOUT = 180000;     // 前端总超时 3 分钟
+
+function genSleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function genShowError(msg, hint) {
+  genResults.innerHTML = `<div class="svg-placeholder" style="color:var(--error)">错误: ${escapeHtml(msg)}${hint ? '（' + escapeHtml(hint) + '）' : ''}</div>`;
+}
+
+async function genPollJob(jobId) {
+  const deadline = Date.now() + GEN_POLL_TIMEOUT;
+  while (Date.now() < deadline) {
+    await genSleep(GEN_POLL_INTERVAL);
+    try {
+      const resp = await apiFetch('/api/generate/jobs/' + encodeURIComponent(jobId));
+      const job = await resp.json();
+      if (job.status === 'done') {
+        if (job.images && job.images.length > 0) {
+          genResultsData = job.images;
+          renderGenResults(job.images, job.elapsed_ms);
+        } else {
+          genShowError('生成完成但未返回图像');
+        }
+        return;
+      }
+      if (job.status === 'failed') {
+        genShowError(job.error || '生成失败', job.retryable ? '可重试或更换后端' : '');
+        return;
+      }
+      if (job.status === 'not_found') {
+        genShowError('任务已过期，请重新生成');
+        return;
+      }
+      // queued / running — 更新进度文案
+      if (job.progress) {
+        genResults.innerHTML = `<div class="svg-placeholder">${escapeHtml(job.progress)}</div>`;
+      }
+    } catch (e) {
+      // 单次轮询失败不中断，继续重试直到总超时
+    }
+  }
+  genShowError('生成超时，请重试');
+}
+
 if (genBtn) {
   genBtn.addEventListener('click', async () => {
     const prompt = genPrompt.value.trim();
@@ -1150,7 +1196,7 @@ if (genBtn) {
     genBtn.disabled = true;
     genBtn.querySelector('.btn-text').classList.add('hidden');
     genBtn.querySelector('.btn-loader').classList.remove('hidden');
-    genResults.innerHTML = '<div class="svg-placeholder">生成中，通常 10–60 秒...</div>';
+    genResults.innerHTML = '<div class="svg-placeholder">排队中，准备提交…</div>';
     genHint.textContent = '生成图为灵感稿，印刷请走右侧生产链路';
 
     const formData = new FormData();
@@ -1161,17 +1207,15 @@ if (genBtn) {
     if (genRefFileObj) formData.append('ref_image', genRefFileObj);
 
     try {
-      const resp = await apiFetch('/api/generate', { method: 'POST', body: formData });
+      const resp = await apiFetch('/api/generate/jobs', { method: 'POST', body: formData });
       const data = await resp.json();
-      if (data.success && data.images && data.images.length > 0) {
-        genResultsData = data.images;
-        renderGenResults(data.images, data.elapsed_ms);
-      } else {
-        const hint = data.retryable ? '（可重试或更换后端）' : '';
-        genResults.innerHTML = `<div class="svg-placeholder" style="color:var(--error)">错误: ${escapeHtml(data.error || '生成失败')} ${hint}</div>`;
+      if (!data.success || !data.job_id) {
+        genShowError(data.error || '提交失败');
+        return;
       }
+      await genPollJob(data.job_id);
     } catch (e) {
-      genResults.innerHTML = `<div class="svg-placeholder" style="color:var(--error)">请求失败: ${escapeHtml(fetchErrorMessage(e))}</div>`;
+      genShowError(fetchErrorMessage(e));
     } finally {
       genBtn.disabled = false;
       genBtn.querySelector('.btn-text').classList.remove('hidden');

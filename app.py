@@ -6,6 +6,9 @@ import base64
 import secrets
 import tempfile
 import logging
+import time
+import threading
+import uuid
 
 from colorflow_sdk import ColorFlowSDK, extract_svg_colors
 from colorflow_sdk.exceptions import ValidationError
@@ -25,7 +28,10 @@ from gen_backends import dispatch as gen_dispatch, available_backends, GenError 
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB
-app.config["UPLOAD_FOLDER"] = "/tmp/colorflow-uploads"
+# 上传目录：桌面封装（colorflow_desktop_app.py）通过 COLORFLOW_UPLOAD_DIR 指向临时目录；
+# 未设置时回退到 /tmp（Linux/macOS 或已 chdir 的 Windows）
+_upload_dir = os.getenv("COLORFLOW_UPLOAD_DIR") or "/tmp/colorflow-uploads"
+app.config["UPLOAD_FOLDER"] = _upload_dir
 
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
@@ -1031,6 +1037,124 @@ def _gen_error_response(e: GenGenError):
     }), status
 
 
+def _gen_form_params():
+    """从 multipart form 读取生图参数。
+
+    Returns:
+        (params_dict, None) 成功；或 (None, (error_response, status)) 失败。
+    """
+    prompt = (request.form.get("prompt", "") or "").strip()
+    if not prompt:
+        return None, (jsonify({"error": "prompt 不能为空"}), 400)
+
+    backend = (request.form.get("backend", "auto") or "auto").strip()
+    size = (request.form.get("size", "1024x1024") or "1024x1024").strip()
+    try:
+        n = max(1, min(int(request.form.get("n", "1") or "1"), 4))
+    except (TypeError, ValueError):
+        n = 1
+    model = (request.form.get("model", "") or "").strip()
+
+    ref_bytes = None
+    if "ref_image" in request.files and request.files["ref_image"].filename:
+        rf = request.files["ref_image"]
+        ctype = rf.content_type or "image/png"
+        if ctype not in ALLOWED_CONTENT_TYPES:
+            return None, (jsonify({"error": f"参考图类型不支持: {ctype}"}), 415)
+        ref_bytes = rf.read()
+
+    return {"prompt": prompt, "backend": backend, "size": size, "n": n,
+            "model": model, "ref_image": ref_bytes}, None
+
+
+def _gen_results_to_images(results):
+    """GenResult 列表 → 前端期望的 images 结构（base64）"""
+    images = []
+    for r in results:
+        images.append({
+            "png_base64": base64.b64encode(r.png_bytes).decode("utf-8"),
+            "width": r.width,
+            "height": r.height,
+            "backend": r.backend,
+            "model": r.model,
+            "meta": r.meta,
+        })
+    return images
+
+
+# ============================================================
+# 异步任务模式（Phase 2）
+# ============================================================
+#
+# 生图耗时 10–60s，同步请求易撞网关超时。任务模式参考 ComfyUI
+# /prompt + /history 设计：提交即返回 job_id，前端轮询 GET 取状态。
+#
+# 存储：进程内 dict + 锁（单进程 Flask 适用）。多 worker 生产部署
+# （gunicorn -w N）需换共享存储（Redis/DB），此处不做，保持极简。
+# job_id 为 uuid4 不透明串，不暴露任何生成参数。
+
+_JOBS = {}
+_JOBS_LOCK = threading.Lock()
+_JOB_TTL = 600          # 任务保留 10 分钟
+_JOB_PROGRESS_MSG = "生成中，通常 10–60 秒…"
+
+
+def _prune_jobs_locked():
+    """清理过期任务（调用方需持 _JOBS_LOCK）"""
+    now = time.time()
+    dead = [jid for jid, job in _JOBS.items() if now - job["created_at"] > _JOB_TTL]
+    for jid in dead:
+        _JOBS.pop(jid, None)
+
+
+def _gen_job_worker(job_id, params):
+    """后台线程：执行生图并更新任务状态。
+
+    任何异常都落为 failed 并记录 code/retryable，绝不假成功。
+    """
+    with _JOBS_LOCK:
+        job = _JOBS.get(job_id)
+        if not job:
+            return
+        job["status"] = "running"
+        job["progress"] = _JOB_PROGRESS_MSG
+
+    t0 = time.time()
+    try:
+        results = gen_dispatch(
+            params["prompt"], ref_image=params["ref_image"],
+            backend=params["backend"], size=params["size"],
+            n=params["n"], model=params["model"],
+        )
+        images = _gen_results_to_images(results)
+        with _JOBS_LOCK:
+            job["status"] = "done"
+            job["progress"] = "完成"
+            job["images"] = images
+            job["count"] = len(images)
+            job["elapsed_ms"] = int((time.time() - t0) * 1000)
+            job["finished_at"] = time.time()
+    except GenGenError as e:
+        with _JOBS_LOCK:
+            job["status"] = "failed"
+            job["progress"] = "失败"
+            job["error"] = str(e)
+            job["code"] = e.code
+            job["retryable"] = e.retryable
+            job["elapsed_ms"] = int((time.time() - t0) * 1000)
+            job["finished_at"] = time.time()
+    except Exception as e:
+        logger.exception("gen_job_worker 生图失败")
+        with _JOBS_LOCK:
+            job["status"] = "failed"
+            job["progress"] = "失败"
+            job["error"] = f"生图失败: {e}"
+            job["code"] = "upstream"
+            job["retryable"] = True
+            job["elapsed_ms"] = int((time.time() - t0) * 1000)
+            job["finished_at"] = time.time()
+
+
 @app.route("/api/generate/backends", methods=["GET"])
 def gen_backends_status():
     """返回已配置的生图后端状态（Key 不回显，仅 available 标志）"""
@@ -1054,7 +1178,7 @@ def gen_backends_status():
 
 @app.route("/api/generate", methods=["POST"])
 def generate_image_api():
-    """AI 生图：prompt → 云端图像大模型 → PNG（base64）
+    """AI 生图（同步版，Phase 1）：prompt → 云端图像大模型 → PNG（base64）
 
     Form 参数（multipart/form-data，与 /api/trace 风格一致）：
         prompt      生图描述（必填，中文/英文均可）
@@ -1064,57 +1188,73 @@ def generate_image_api():
         n           生成张数 1-4（默认 1）
         model       覆盖模型名（可选）
     """
-    prompt = (request.form.get("prompt", "") or "").strip()
-    if not prompt:
-        return jsonify({"error": "prompt 不能为空"}), 400
-
-    backend = (request.form.get("backend", "auto") or "auto").strip()
-    size = (request.form.get("size", "1024x1024") or "1024x1024").strip()
+    params, err = _gen_form_params()
+    if err:
+        return err
     try:
-        n = max(1, min(int(request.form.get("n", "1") or "1"), 4))
-    except (TypeError, ValueError):
-        n = 1
-    model = (request.form.get("model", "") or "").strip()
-
-    # 参考图校验（复用图片类型白名单 + 大小上限）
-    ref_bytes = None
-    if "ref_image" in request.files and request.files["ref_image"].filename:
-        rf = request.files["ref_image"]
-        ctype = rf.content_type or "image/png"
-        if ctype not in ALLOWED_CONTENT_TYPES:
-            return jsonify({"error": f"参考图类型不支持: {ctype}"}), 415
-        ref_bytes = rf.read()
-
-    try:
-        import time as _time
-
-        t0 = _time.time()
+        t0 = time.time()
         results = gen_dispatch(
-            prompt, ref_image=ref_bytes, backend=backend,
-            size=size, n=n, model=model,
+            params["prompt"], ref_image=params["ref_image"],
+            backend=params["backend"], size=params["size"],
+            n=params["n"], model=params["model"],
         )
-        elapsed_ms = int((_time.time() - t0) * 1000)
-        images = []
-        for r in results:
-            images.append({
-                "png_base64": base64.b64encode(r.png_bytes).decode("utf-8"),
-                "width": r.width,
-                "height": r.height,
-                "backend": r.backend,
-                "model": r.model,
-                "meta": r.meta,
-            })
+        images = _gen_results_to_images(results)
         return jsonify({
             "success": True,
             "images": images,
             "count": len(images),
-            "elapsed_ms": elapsed_ms,
+            "elapsed_ms": int((time.time() - t0) * 1000),
         })
     except GenGenError as e:
         return _gen_error_response(e)
     except Exception as e:
         logger.exception("generate_image_api 生图失败")
         return jsonify({"error": f"生图失败: {e}"}), 500
+
+
+@app.route("/api/generate/jobs", methods=["POST"])
+def gen_jobs_create():
+    """提交异步生图任务（Phase 2）。提交即返回 job_id，不阻塞。
+
+    Form 参数与 /api/generate 一致。
+    Returns:
+        {success, job_id, status: "queued"}
+    """
+    params, err = _gen_form_params()
+    if err:
+        return err
+
+    job_id = uuid.uuid4().hex
+    now = time.time()
+    with _JOBS_LOCK:
+        _prune_jobs_locked()
+        _JOBS[job_id] = {
+            "job_id": job_id,
+            "status": "queued",
+            "progress": "排队中…",
+            "created_at": now,
+        }
+
+    threading.Thread(target=_gen_job_worker, args=(job_id, params), daemon=True).start()
+    return jsonify({"success": True, "job_id": job_id, "status": "queued"})
+
+
+@app.route("/api/generate/jobs/<job_id>", methods=["GET"])
+def gen_jobs_get(job_id):
+    """查询异步生图任务状态。
+
+    status: queued / running / done / failed
+      - done: 携带 images（与 /api/generate 一致）+ count + elapsed_ms
+      - failed: 携带 error + code + retryable
+    """
+    with _JOBS_LOCK:
+        _prune_jobs_locked()
+        job = _JOBS.get(job_id)
+        if not job:
+            return jsonify({"error": "任务不存在或已过期", "status": "not_found"}), 404
+        # 构造快照（避免前端持有活引用）
+        snap = {k: v for k, v in job.items()}
+    return jsonify(snap)
 
 
 if __name__ == "__main__":

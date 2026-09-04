@@ -1,0 +1,7 @@
+# 桌面封装额外依赖（先装 requirements.txt，再装本文件）
+#   pip install -r requirements.txt -r requirements-desktop.txt
+#   pyinstaller colorflow_desktop_app.spec
+#
+# pywebview 在 Windows 上自动使用 Edge WebView2（Win10/11 已内置）
+pywebview>=5.0
+pyinstaller>=6.0

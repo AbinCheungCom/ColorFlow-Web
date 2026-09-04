@@ -11,6 +11,7 @@ import base64
 import io
 import json
 import os
+import time
 
 import pytest
 
@@ -28,6 +29,25 @@ def _png_bytes():
     buf = io.BytesIO()
     Image.new("RGBA", (1, 1), (255, 0, 0, 255)).save(buf, format="PNG")
     return buf.getvalue()
+
+
+def _submit_and_wait(client, data, timeout=10.0, interval=0.05):
+    """提交异步生图任务并轮询直到 done/failed 或超时，返回 (job_id, job_snapshot)"""
+    resp = client.post("/api/generate/jobs", data=data,
+                       content_type="multipart/form-data")
+    assert resp.status_code == 200
+    d = resp.get_json()
+    assert d["success"] is True and d["job_id"]
+    assert d["status"] == "queued"
+    job_id = d["job_id"]
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        r = client.get(f"/api/generate/jobs/{job_id}")
+        j = r.get_json()
+        if j.get("status") in ("done", "failed"):
+            return job_id, j
+        time.sleep(interval)
+    return job_id, client.get(f"/api/generate/jobs/{job_id}").get_json()
 
 
 # ============================================================
@@ -311,3 +331,175 @@ class TestMCPGenerate:
         data = json.loads(ms.generate_image("box"))
         assert data.get("error")
         assert data.get("retryable") is True
+
+
+# ============================================================
+# 异步任务模式（/api/generate/jobs，Phase 2）
+# ============================================================
+
+class TestGenerateJobs:
+    """POST 提交 → GET 轮询 → done/failed 状态机"""
+
+    def test_create_returns_job_id(self):
+        resp = client.post(
+            "/api/generate/jobs",
+            data={"prompt": "box"},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 200
+        d = resp.get_json()
+        assert d["success"] is True
+        assert d["status"] == "queued"
+        assert len(d["job_id"]) > 10
+
+    def test_no_prompt_400(self):
+        resp = client.post("/api/generate/jobs", data={},
+                           content_type="multipart/form-data")
+        assert resp.status_code == 400
+
+    def test_unknown_job_404(self):
+        resp = client.get("/api/generate/jobs/deadbeef000000000000000000000000")
+        assert resp.status_code == 404
+        assert resp.get_json()["status"] == "not_found"
+
+    def test_done_with_images(self, monkeypatch):
+        """成功：job 走完 queued→running→done，done 携带 images（与同步端点结构一致）"""
+        png = _png_bytes()
+
+        def fake_dispatch(prompt, ref_image=None, backend="auto",
+                          size=(1024, 1024), n=1, timeout=120, model=""):
+            return [GenResult(png_bytes=png, width=1, height=1,
+                              backend="volcano", model="seedream")]
+
+        monkeypatch.setattr("app.gen_dispatch", fake_dispatch)
+        _, job = _submit_and_wait(
+            client, {"prompt": "a box"}, timeout=5.0
+        )
+        assert job["status"] == "done"
+        assert job["count"] == 1
+        img = job["images"][0]
+        assert img["backend"] == "volcano"
+        assert img["width"] == 1
+        assert base64.b64decode(img["png_base64"]) == png
+        assert job["elapsed_ms"] >= 0
+
+    def test_failed_propagates_code(self, monkeypatch):
+        """失败：GenError 的 code/retryable 落进 job，绝不假成功"""
+        def fake_dispatch(prompt, **kw):
+            raise GenError("quota", "no credit", retryable=True)
+
+        monkeypatch.setattr("app.gen_dispatch", fake_dispatch)
+        _, job = _submit_and_wait(client, {"prompt": "box"}, timeout=5.0)
+        assert job["status"] == "failed"
+        assert job["code"] == "quota"
+        assert job["retryable"] is True
+        assert job["error"]
+
+    def test_no_backend_fails_with_auth(self, monkeypatch):
+        for k in ("VOLCANO_API_KEY", "FAL_KEY", "COMFYUI_URL"):
+            monkeypatch.delenv(k, raising=False)
+        _, job = _submit_and_wait(client, {"prompt": "box"}, timeout=5.0)
+        assert job["status"] == "failed"
+        assert job["code"] == "auth"
+        assert job["retryable"] is False
+
+
+# ============================================================
+# full_pipeline MCP（生图→抠图→描图→Pantone→报价→ZIP，逐级降级）
+# ============================================================
+
+class TestFullPipeline:
+    def test_registered(self):
+        import mcp_server as ms
+
+        assert callable(ms.full_pipeline)
+
+    def test_empty_prompt(self):
+        import mcp_server as ms
+
+        data = json.loads(ms.full_pipeline(""))
+        assert data.get("error")
+
+    def test_success_builds_zip(self, monkeypatch, tmp_path):
+        import mcp_server as ms
+        import zipfile
+
+        png = _png_bytes()
+        out = tmp_path / "pipeline"
+
+        def fake_dispatch(prompt, **kw):
+            return [GenResult(png_bytes=png, width=1, height=1,
+                              backend="fal", model="flux")]
+
+        monkeypatch.setattr("mcp_server.gen_dispatch", fake_dispatch)
+        # 抠图降级：返回原图路径（等价于抠图失败用原图）
+        monkeypatch.setattr(ms.sdk, "cutout", lambda path, **kw: path)
+        # 描图：写一个含填充色的最小合法 SVG
+        def fake_trace(path, **kw):
+            p = tmp_path / "out.svg"
+            p.write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1">'
+                '<rect fill="#DA291C" width="1" height="1"/></svg>',
+                encoding="utf-8",
+            )
+            return str(p)
+
+        monkeypatch.setattr(ms.sdk, "trace", fake_trace)
+
+        data = json.loads(ms.full_pipeline("box", output_dir=str(out)))
+        assert data["success"] is True
+        assert os.path.exists(data["zip_path"])
+        assert data["color_count"] >= 1
+        assert data["quote"] is not None
+        assert data["quote"]["total_cost_usd"] > 0
+        with zipfile.ZipFile(data["zip_path"]) as zf:
+            names = set(zf.namelist())
+        for expected in ("colorflow_gen.png", "colorflow_output.svg",
+                         "colorflow_palette.json", "colorflow_quote.json"):
+            assert expected in names, f"zip 缺 {expected}"
+
+    def test_cutout_failure_degrades(self, monkeypatch, tmp_path):
+        """抠图失败 → 记录 errors 但流水线继续，最终 success=True"""
+        import mcp_server as ms
+
+        png = _png_bytes()
+
+        def fake_dispatch(prompt, **kw):
+            return [GenResult(png_bytes=png, width=1, height=1,
+                              backend="fal", model="flux")]
+
+        monkeypatch.setattr("mcp_server.gen_dispatch", fake_dispatch)
+
+        def boom_cutout(path, **kw):
+            raise RuntimeError("model not loaded")
+
+        monkeypatch.setattr(ms.sdk, "cutout", boom_cutout)
+
+        def fake_trace(path, **kw):
+            p = tmp_path / "o.svg"
+            p.write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1">'
+                '<rect fill="#DA291C" width="1" height="1"/></svg>',
+                encoding="utf-8",
+            )
+            return str(p)
+
+        monkeypatch.setattr(ms.sdk, "trace", fake_trace)
+
+        data = json.loads(ms.full_pipeline("box", output_dir=str(tmp_path)))
+        assert data["success"] is True, data
+        assert any("抠图失败" in e for e in data["errors"])
+
+    def test_gen_failure_short_circuits(self, monkeypatch, tmp_path):
+        """生图失败 → 直接返回错误，不产出 ZIP"""
+        import mcp_server as ms
+
+        def fake_dispatch(prompt, **kw):
+            raise GenError("timeout", "slow", retryable=True)
+
+        monkeypatch.setattr("mcp_server.gen_dispatch", fake_dispatch)
+        data = json.loads(ms.full_pipeline("box", output_dir=str(tmp_path)))
+        assert data.get("error")
+        assert data["code"] == "timeout"
+        assert data["retryable"] is True
+        assert not os.path.exists(str(tmp_path / "colorflow_pipeline.zip"))

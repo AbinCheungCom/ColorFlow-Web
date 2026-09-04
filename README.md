@@ -102,17 +102,25 @@ export GEN_MAX_IMAGES=4           # 单次最多张数
 ### 示例
 
 ```bash
-# AI 生图 → PNG（base64）
+# AI 生图 → PNG（base64，同步版，适合生图 <30s）
 curl -X POST http://localhost:5000/api/generate \
   -F "prompt=红色天地盖礼盒，烫金logo，哑光，电商白底" \
   -F "backend=auto" \
   -F "size=1024x1024"
+
+# AI 生图 → 异步任务（生图 10–60s 推荐，避免网关超时）
+JOB=$(curl -s -X POST http://localhost:5000/api/generate/jobs \
+  -F "prompt=红色天地盖礼盒，烫金logo" -F "backend=auto" | jq -r .job_id)
+curl http://localhost:5000/api/generate/jobs/$JOB
+# → {"status":"queued|running|done|failed", ...}  done 时携带 images
 
 # 查看已配置的生图后端
 curl http://localhost:5000/api/generate/backends
 ```
 
 > 生成图为灵感稿，印刷请走右侧生产链路。无后端 Key 时返回 401 明确提示。
+> 前端 Tab 6 统一走任务模式（提交 → 轮询，2s 间隔，3 分钟超时），进度文案实时刷新。
+> 任务存储为进程内（单进程 Flask）；多 worker 生产部署需换共享存储（Redis/DB）。
 
 ## API Key 管理
 
@@ -194,7 +202,7 @@ curl -X POST http://localhost:5000/api/restart
 }
 ```
 
-### 可用工具（12 个）
+### 可用工具（13 个）
 
 | Tool | 说明 | 关键参数 |
 |------|------|---------|
@@ -210,6 +218,7 @@ curl -X POST http://localhost:5000/api/restart
 | `export_pantone_pdf` | 色卡 / 匹配报告 PDF | export_type（swatch / report / palette）, 颜色数据 |
 | `greyscale3d` | 位图 → 3D 灰度高度图 / 位移贴图 | invert, contrast, gamma, smooth, auto_levels, bit_depth |
 | `generate_image` | AI 生成包装效果图（零本地 GPU）| prompt, backend（auto 降级）, ref_image_path, size, n |
+| `full_pipeline` | 一句话：生图→抠图→描图→Pantone→报价→ZIP | prompt, width_mm, height_mm, qty, colors, backend |
 
 ### Agent 调用示例
 
@@ -240,6 +249,11 @@ Agent: 调用 greyscale3d("D:/object.jpg", invert=True, contrast=1.5, gamma=0.9,
 Agent: 调用 generate_image("红色天地盖礼盒，烫金logo，哑光，电商白底")
   → {success, images: [{png_path, width, height, backend: "volcano"}]}
   再调 trace_image(png_path) → SVG 路径
+
+用户: 「生成一个礼盒效果图，一条龙出 SVG、Pantone 色号和印刷报价」
+Agent: 调用 full_pipeline("红色天地盖礼盒，烫金logo", width_mm=210,
+         height_mm=297, qty=1000)
+  → {success, zip_path: "colorflow_pipeline.zip", quote: {...}, files: [...]}
 ```
 
 ## API 接口
@@ -256,7 +270,9 @@ Agent: 调用 generate_image("红色天地盖礼盒，烫金logo，哑光，电�
 | `POST` | `/api/print/export` | 位图 → 印刷级 CMYK PDF 下载 |
 | `POST` | `/api/pantone/export` | 色卡 / 匹配报告 PDF（CMYK）|
 | `POST` | `/api/grayscale3d` | 位图 → 3D 灰度高度图 / 位移贴图（8/16-bit PNG）|
-| `POST` | `/api/generate` | AI 生图 → PNG（base64），backend=auto 按优先级降级 |
+| `POST` | `/api/generate` | AI 生图（同步）→ PNG（base64），backend=auto 按优先级降级 |
+| `POST` | `/api/generate/jobs` | AI 生图（异步任务）→ `{job_id, status:"queued"}` |
+| `GET` | `/api/generate/jobs/<id>` | 查询任务状态 queued/running/done/failed（done 携 images）|
 | `GET` | `/api/generate/backends` | 生图后端状态（volcano/fal/comfyui 可用性）|
 | `POST` | `/api/restart` | 触发服务重启（异步启动 restart.ps1）|
 | `POST` | `/api/keys/generate` | 生成新 API Key |
@@ -365,16 +381,18 @@ curl -X POST http://localhost:5000/api/restart
 
 ```
 colorflow-web/
-├── app.py               # Flask 入口，所有 API 路由 + Key 管理端点 + 3D 灰度图 + AI 生图 + 服务重启
+├── app.py               # Flask 入口，所有 API 路由 + Key 管理 + 3D 灰度图 + AI 生图(同步/任务) + 服务重启
 ├── gen_backends.py      # GEN 生图适配器层（volcano / fal / comfyui + auto 降级 + GenResult/GenError）
 ├── colorflow_keys.py    # KeyStore：API Key 生成 / 校验 / 撤销
-├── mcp_server.py        # MCP Server（12 工具 + Key 认证）
+├── mcp_server.py        # MCP Server（13 工具 + Key 认证）
+├── colorflow_desktop_app.py   # 桌面入口（PyWebview 原生窗口 + Flask 线程）
+├── colorflow_desktop_app.spec # PyInstaller 打包配置
 ├── restart.ps1          # 服务重启脚本（杀旧进程 + 拉起新实例）
 ├── templates/
 │   └── index.html      # 单页（抠图 / 描图 / Pantone / 色彩匹配 / 3D 灰度图 / AI 生图 + 设置页）
 ├── static/
 │   ├── style.css       # Figma DESIGN.md 样式
-│   ├── app.js          # 前端交互 + Key 管理 + MCP 配置 + 3D 灰度图 + AI 生图
+│   ├── app.js          # 前端交互 + Key 管理 + MCP 配置 + 3D 灰度图 + AI 生图(任务轮询)
 │   └── favicon.*       # 浏览器图标（ico/png/svg/manifest）
 ├── assets/
 │   └── gen_workflow_api.json  # ComfyUI 文生图工作流模板（可替换本机构造）
@@ -384,17 +402,19 @@ colorflow-web/
 │   ├── conftest.py     # 共享配置（U2NET_HOME 回退包内模型）
 │   ├── test_app.py     # API 集成测试 + Key 管理 + 3D 灰度图 + 抠图/忽略白色
 │   ├── test_mcp.py     # MCP Server 全工具测试
-│   └── test_gen.py     # GEN 生图适配器（mock 后端 + auto 降级）
+│   └── test_gen.py     # GEN 生图适配器（mock 后端 + auto 降级 + 任务模式 + 流水线）
+├── .github/workflows/ci.yml  # GitHub Actions（pytest + zip 产物）
 ├── start.bat           # Windows 一键启动
 ├── DEPLOY.md           # 部署说明
-└── requirements.txt    # 依赖清单
+├── requirements.txt    # 依赖清单
+└── requirements-desktop.txt  # 桌面打包依赖（pywebview + pyinstaller）
 ```
 
 ## 测试
 
 ```bash
 pip install pytest
-python -m pytest tests/ -q     # 117 个用例
+python -m pytest tests/ -q     # 128 个用例
 ```
 
 ## 相关项目

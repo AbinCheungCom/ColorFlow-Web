@@ -824,5 +824,175 @@ def generate_image(
     )
 
 
+# ============================================================
+# 一句话流水线（Phase 2）：生图 → 抠图 → 描图 → Pantone → 报价 → ZIP
+# ============================================================
+
+
+@mcp.tool()
+def full_pipeline(
+    prompt: str,
+    width_mm: float = 210.0,
+    height_mm: float = 297.0,
+    depth_mm: float = 0.0,
+    qty: int = 1000,
+    colors: int = 4,
+    backend: str = "auto",
+    output_dir: str = "/tmp/colorflow-pipeline",
+) -> str:
+    """一句话完成：生图→抠图→描图→Pantone→报价→生产文件 ZIP。
+
+    刀板（DIELINE）模块未就绪时止于 Pantone + 报价（降级不崩溃）。
+    每一步失败都记录到 errors 并继续，绝不假成功。
+
+    Args:
+        prompt: 生图描述（中文/英文均可）
+        width_mm: 成品宽（毫米），用于报价
+        height_mm: 成品高（毫米），用于报价
+        depth_mm: 成品深度（毫米），刀板模块预留位
+        qty: 印刷数量
+        colors: 颜色数（报价用，默认 4C）
+        backend: auto / volcano / fal / comfyui
+        output_dir: 输出目录
+    Returns:
+        JSON: {success, zip_path, files, quote, color_count, errors}
+    """
+    auth = _auth_check()
+    if auth:
+        return auth
+    if not prompt or not prompt.strip():
+        return json.dumps({"error": "prompt 不能为空"}, ensure_ascii=False)
+
+    from mcp_print.tools.colors import cmyk_to_rgb
+    import tempfile
+    import zipfile
+
+    files = []      # [(type, path)]
+    errors = []
+
+    try:
+        # ── 1) 生图 ────────────────────────────────────────────
+        gen_results = gen_dispatch(prompt, backend=backend, size=(1024, 1024), n=1)
+        os.makedirs(output_dir, exist_ok=True)
+        gen_png = None
+        for idx, r in enumerate(gen_results):
+            tmp = tempfile.NamedTemporaryFile(
+                prefix="gen_", suffix=".png", dir=output_dir, delete=False
+            )
+            tmp.write(r.png_bytes)
+            tmp.close()
+            gen_png = tmp.name
+            files.append(("gen_image", gen_png))
+            if idx == 0:
+                break  # 取首张作为流水线输入
+        if not gen_png:
+            return json.dumps({"error": "生图未返回有效图像", "errors": errors},
+                               ensure_ascii=False)
+
+        # ── 2) 抠图（降级：失败则直接用原图）────────────────────
+        cutout_png = gen_png
+        try:
+            cutout_png = sdk.cutout(gen_png, model="silueta", alpha_matting=True)
+            files.append(("cutout", cutout_png))
+        except Exception as e:
+            errors.append(f"抠图失败（用原图降级）: {e}")
+
+        # ── 3) 描图 ────────────────────────────────────────────
+        svg_path = sdk.trace(
+            cutout_png, mode="color", colormode="rgb8", hierarchical="stacked",
+            path_precision=10, filter_speckle=4, length_threshold=2.0,
+            color_precision=6, layer_difference=64, corner_threshold=60,
+        )
+        files.append(("svg", svg_path))
+
+        # ── 4) 主色 + Pantone 匹配 ─────────────────────────────
+        with open(svg_path, "rb") as f:
+            svg_bytes = f.read()
+        palette = []
+        for c in extract_svg_colors(svg_bytes, top_n=5):
+            matches = []
+            try:
+                for m in pantone_search(hex_color=c["hex"]).get("matches", [])[:3]:
+                    rgb = cmyk_to_rgb(m["c"], m["m"], m["y"], m["k"])
+                    matches.append({
+                        "name": m["name"],
+                        "hex": m["hex"],
+                        "cmyk": [m["c"], m["m"], m["y"], m["k"]],
+                        "rgb": [rgb["r"], rgb["g"], rgb["b"]],
+                        "delta_e": round(
+                            _delta_e(c["hex"], (m["c"], m["m"], m["y"], m["k"])), 2
+                        ),
+                    })
+            except Exception as e:
+                errors.append(f"Pantone 匹配失败（跳过该色）: {e}")
+            palette.append({"color": c, "pantone_matches": matches})
+
+        # ── 5) 报价（降级：失败则 quote 为 None）──────────────
+        quote = None
+        try:
+            n_colors = max(2, min(int(colors) or 4, len(palette) + 1))
+            q = print_cost_estimate(
+                width_mm=float(width_mm), height_mm=float(height_mm),
+                quantity=int(qty), num_colors=n_colors,
+                paper_gsm=120.0, print_method="offset",
+            )
+            quote = {
+                "ink_cost_usd": q["ink_cost"],
+                "setup_cost_usd": q["setup_cost"],
+                "paper_cost_usd": q["paper_cost"],
+                "total_cost_usd": q["total_cost"],
+                "cost_per_unit_usd": q["cost_per_unit"],
+                "currency": q["currency"],
+                "colors": n_colors,
+                "qty": int(qty),
+            }
+        except Exception as e:
+            errors.append(f"报价失败: {e}")
+
+        # ── 6) 打包 ZIP：PNG + 抠图 + SVG + palette + quote ────
+        palette_path = os.path.join(output_dir, "colorflow_palette.json")
+        quote_path = os.path.join(output_dir, "colorflow_quote.json")
+        with open(palette_path, "w", encoding="utf-8") as f:
+            json.dump({"palette": palette}, f, ensure_ascii=False, indent=2)
+        files.append(("palette", palette_path))
+        if quote:
+            with open(quote_path, "w", encoding="utf-8") as f:
+                json.dump({"quote": quote}, f, ensure_ascii=False, indent=2)
+            files.append(("quote", quote_path))
+
+        zip_path = os.path.join(output_dir, "colorflow_pipeline.zip")
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.write(gen_png, "colorflow_gen.png")
+            if cutout_png != gen_png:
+                zf.write(cutout_png, "colorflow_cutout.png")
+            zf.write(svg_path, "colorflow_output.svg")
+            zf.write(palette_path, "colorflow_palette.json")
+            if quote:
+                zf.write(quote_path, "colorflow_quote.json")
+        files.append(("zip", zip_path))
+
+        return json.dumps({
+            "success": True,
+            "zip_path": zip_path,
+            "files": [{"type": t, "path": p} for t, p in files],
+            "quote": quote,
+            "color_count": len(palette),
+            "errors": errors,
+        }, ensure_ascii=False)
+    except GenGenError as e:
+        return json.dumps({
+            "error": f"生图失败({e.code}): {e}",
+            "code": e.code, "retryable": e.retryable,
+            "files": [{"type": t, "path": p} for t, p in files],
+            "errors": errors,
+        }, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({
+            "error": f"流水线失败: {e}",
+            "files": [{"type": t, "path": p} for t, p in files],
+            "errors": errors + [str(e)],
+        }, ensure_ascii=False)
+
+
 if __name__ == "__main__":
     mcp.run()
