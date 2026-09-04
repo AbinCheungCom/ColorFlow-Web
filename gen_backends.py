@@ -25,6 +25,32 @@ import logging
 
 logger = logging.getLogger("colorflow.gen")
 
+
+def _get_key(provider: str) -> str:
+    """从 llm_keys 读取 key，回退到环境变量。"""
+    try:
+        from llm_keys import llm_keystore
+        key = llm_keystore.get_key(provider)
+        if key:
+            return key
+    except Exception:
+        pass
+    env_map = {"volcano": "VOLCANO_API_KEY", "fal": "FAL_KEY", "comfyui": "COMFYUI_URL"}
+    return os.getenv(env_map.get(provider, ""), "").strip()
+
+
+def _get_base(provider: str, default: str) -> str:
+    """从 llm_keys 读取 base_url，回退到环境变量或默认值。"""
+    try:
+        from llm_keys import llm_keystore
+        cfg = llm_keystore.get_config(provider)
+        if cfg and isinstance(cfg, dict):
+            return cfg.get("base_url", "")
+    except Exception:
+        pass
+    env_map = {"volcano": "VOLCANO_BASE_URL", "fal": "FAL_BASE_URL", "comfyui": "COMFYUI_URL"}
+    return os.getenv(env_map.get(provider, ""), "") or default
+
 # ── 后端优先级（auto 模式按此顺序探测）──────────────────────────────
 _BACKEND_PRIORITY = ("volcano", "fal", "comfyui")
 
@@ -148,11 +174,11 @@ def _parse_size(size) -> "tuple[int, int]":
 def available_backends() -> list:
     """仅注册配置了 API Key/URL 的后端，按优先级排序"""
     found = []
-    if _env("VOLCANO_API_KEY"):
+    if _get_key("volcano"):
         found.append("volcano")
-    if _env("FAL_KEY"):
+    if _get_key("fal"):
         found.append("fal")
-    if _env("COMFYUI_URL"):
+    if _get_key("comfyui"):
         found.append("comfyui")
     # 保持优先级顺序
     return [b for b in _BACKEND_PRIORITY if b in found]
@@ -169,9 +195,9 @@ def _gen_volcano(prompt: str, ref_image: bytes = None,
                  size=(1024, 1024), n: int = 1, timeout: int = 120,
                  model: str = "") -> list:
     """火山方舟生图。Seedream 支持中文 prompt，图生图传 ref_image。"""
-    key = _env("VOLCANO_API_KEY")
+    key = _get_key("volcano")
     if not key:
-        raise GenError("auth", "未配置 VOLCANO_API_KEY", retryable=False)
+        raise GenError("auth", "未配置火山方舟 API Key", retryable=False)
     if not model:
         model = _env("VOLCANO_MODEL") or "doubao-seedream-4-0-t2i"
     w, h = _parse_size(size)
@@ -188,7 +214,7 @@ def _gen_volcano(prompt: str, ref_image: bytes = None,
         body["image"] = base64.b64encode(ref_image).decode("utf-8")
 
     t0 = time.time()
-    data = _http_json(_VOLCANO_URL, headers={"Authorization": f"Bearer {key}"},
+    data = _http_json(_get_base("volcano", _VOLCANO_URL), headers={"Authorization": f"Bearer {key}"},
                      body=body, timeout=timeout)
     elapsed = int((time.time() - t0) * 1000)
 
@@ -226,7 +252,7 @@ def _gen_fal(prompt: str, ref_image: bytes = None,
              size=(1024, 1024), n: int = 1, timeout: int = 120,
              model: str = "") -> list:
     """fal.ai 队列式生图：提交 → request_id → 轮询 status → 取图。"""
-    key = _env("FAL_KEY")
+    key = _get_key("fal")
     if not key:
         raise GenError("auth", "未配置 FAL_KEY", retryable=False)
     if not model:
@@ -348,7 +374,7 @@ def _gen_comfyui(prompt: str, ref_image: bytes = None,
                  size=(1024, 1024), n: int = 1, timeout: int = 120,
                  model: str = "") -> list:
     """本地 ComfyUI /prompt 提交 + /history 轮询 + /view 取图。"""
-    base = _env("COMFYUI_URL").rstrip("/")
+    base = _get_key("comfyui").rstrip("/")
     if not base:
         raise GenError("auth", "未配置 COMFYUI_URL", retryable=False)
 
@@ -442,11 +468,11 @@ def dispatch(prompt: str, ref_image: bytes = None,
             raise GenError("bad_prompt", f"未知后端: {backend}", retryable=False)
         fn = _BACKENDS[backend]
         # 指定后端也校验是否已配置（volcano/fal 需 Key，comfyui 需 URL）
-        if backend == "volcano" and not _env("VOLCANO_API_KEY"):
-            raise GenError("auth", "未配置 VOLCANO_API_KEY", retryable=False)
-        if backend == "fal" and not _env("FAL_KEY"):
+        if backend == "volcano" and not _get_key("volcano"):
+            raise GenError("auth", "未配置火山方舟 API Key", retryable=False)
+        if backend == "fal" and not _get_key("fal"):
             raise GenError("auth", "未配置 FAL_KEY", retryable=False)
-        if backend == "comfyui" and not _env("COMFYUI_URL"):
+        if backend == "comfyui" and not _get_key("comfyui"):
             raise GenError("auth", "未配置 COMFYUI_URL", retryable=False)
         return fn(prompt, ref_image=ref_image, size=size, n=n, timeout=timeout, model=model)
 

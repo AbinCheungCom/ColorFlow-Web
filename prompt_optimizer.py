@@ -75,8 +75,32 @@ def _http_json(url: str, headers: dict, body: dict, timeout: int = 60) -> dict:
 # Provider 实现
 # ============================================================
 
+def _get_key(provider: str) -> str:
+    """从 llm_keys 读取 key，回退到环境变量。"""
+    try:
+        from llm_keys import llm_keystore
+        key = llm_keystore.get_key(provider)
+        if key:
+            return key
+    except Exception:
+        pass
+    return _env({"openai": "OPENAI_API_KEY"}.get(provider, ""))
+
+
+def _get_base(provider: str, default: str) -> str:
+    """从 llm_keys 读取 base_url，回退到环境变量。"""
+    try:
+        from llm_keys import llm_keystore
+        cfg = llm_keystore.get_config(provider)
+        if cfg and isinstance(cfg, dict):
+            return cfg.get("base_url", "")
+    except Exception:
+        pass
+    env_key = {"openai": "OPENAI_BASE_URL"}.get(provider, "")
+    return _env(env_key) or default
+
+
 def _mock_optimize(prompt: str) -> OptimizeResult:
-    """零 Key 降级：纯字符串拼接，不调 API。"""
     # 简单启发式增强：添加常用图像生成修饰词
     enhanced = (
         f"{prompt}, "
@@ -98,10 +122,10 @@ def _mock_optimize(prompt: str) -> OptimizeResult:
 
 def _openai_optimize(prompt: str, model: str = "", timeout: int = 60) -> OptimizeResult:
     """OpenAI Chat Completions：text→text 优化 prompt。"""
-    api_key = _env("OPENAI_API_KEY")
+    api_key = _get_key("openai")
     if not api_key:
-        raise OptimizeError("auth", "OPENAI_API_KEY 未设置", retryable=False)
-    base_url = _env("OPENAI_BASE_URL") or "https://api.openai.com/v1"
+        raise OptimizeError("auth", "OpenAI API Key 未配置", retryable=False)
+    base_url = _get_base("openai", "https://api.openai.com/v1")
     model = model or _env("VISION_MODEL_OPENAI") or "gpt-4o"
 
     t0 = time.time()
@@ -172,7 +196,7 @@ def dispatch_optimize(prompt: str, backend: str = "auto",
         return _openai_optimize(prompt, model=model, timeout=timeout)
 
     # auto
-    if _env("OPENAI_API_KEY"):
+    if _get_key("openai"):
         try:
             return _openai_optimize(prompt, model=model, timeout=timeout)
         except OptimizeError as e:

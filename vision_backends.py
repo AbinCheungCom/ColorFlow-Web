@@ -59,6 +59,25 @@ def _env(name: str) -> str:
     return os.getenv(name, "").strip()
 
 
+def _get_key(provider: str) -> str:
+    """从 LLM Key Store 或环境变量获取 Key（Key Store 优先）"""
+    from llm_keys import llm_keystore
+    key = llm_keystore.get_key(provider)
+    if key:
+        llm_keystore.mark_used(provider)
+        return key
+    return ""
+
+
+def _get_base(provider: str, default: str = "") -> str:
+    """从 LLM Key Store config 或环境变量获取 Base URL"""
+    from llm_keys import llm_keystore
+    cfg = llm_keystore.get_config(provider)
+    if cfg.get("base_url"):
+        return cfg["base_url"]
+    return default
+
+
 def _http_json(url: str, method: str = "POST", headers: dict = None,
                body: dict = None, timeout: int = 120) -> dict:
     """发起 JSON 请求并解析 JSON 响应（urllib 实现，无额外依赖）。"""
@@ -140,10 +159,10 @@ def mock_backend(prompt: str, image: bytes, timeout: int = 30, model: str = "",
 def openai_backend(prompt: str, image: bytes, timeout: int = 120, model: str = "",
                    lang: str = "en", style: str = "product", **kw) -> PromptResult:
     """OpenAI Vision（gpt-4o）— 事实标准 VLM。"""
-    api_key = _env("OPENAI_API_KEY")
+    api_key = _get_key("openai") or _env("OPENAI_API_KEY")
     if not api_key:
-        raise PromptError("auth", "OPENAI_API_KEY 未设置", retryable=False)
-    base_url = _env("OPENAI_BASE_URL") or "https://api.openai.com/v1"
+        raise PromptError("auth", "OpenAI API Key 未配置（设置页「大模型 API」或环境变量 OPENAI_API_KEY）", retryable=False)
+    base_url = _get_base("openai") or _env("OPENAI_BASE_URL") or "https://api.openai.com/v1"
     model = model or _env("VISION_MODEL_OPENAI") or "gpt-4o"
 
     t0 = time.time()
@@ -183,10 +202,10 @@ def openai_backend(prompt: str, image: bytes, timeout: int = 120, model: str = "
 def claude_backend(prompt: str, image: bytes, timeout: int = 120, model: str = "",
                    lang: str = "en", style: str = "product", **kw) -> PromptResult:
     """Anthropic Claude Vision — 备选 VLM，用于 OpenAI 不可用时。"""
-    api_key = _env("ANTHROPIC_API_KEY")
+    api_key = _get_key("claude") or _env("ANTHROPIC_API_KEY")
     if not api_key:
-        raise PromptError("auth", "ANTHROPIC_API_KEY 未设置", retryable=False)
-    base_url = _env("ANTHROPIC_BASE_URL") or "https://api.anthropic.com"
+        raise PromptError("auth", "Claude API Key 未配置（设置页「大模型 API」或环境变量 ANTHROPIC_API_KEY）", retryable=False)
+    base_url = _get_base("claude") or _env("ANTHROPIC_BASE_URL") or "https://api.anthropic.com"
     model = model or _env("VISION_MODEL_CLAUDE") or "claude-sonnet-4-6"
 
     t0 = time.time()
@@ -240,9 +259,9 @@ _BACKENDS = {
 def available_backends() -> list:
     """探测已配置 Key 的后端列表（按 _BACKEND_PRIORITY 顺序），mock 始终可用。"""
     avail = []
-    if _env("OPENAI_API_KEY"):
+    if _get_key("openai") or _env("OPENAI_API_KEY"):
         avail.append("openai")
-    if _env("ANTHROPIC_API_KEY"):
+    if _get_key("claude") or _env("ANTHROPIC_API_KEY"):
         avail.append("claude")
     avail.append("mock")  # mock 始终可用（零 Key 降级/测试）
     return avail

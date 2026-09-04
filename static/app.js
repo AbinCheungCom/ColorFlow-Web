@@ -194,7 +194,7 @@ function openSettingsModal() {
   loadKeyList();
   updateMcpConfig();
   loadGenBackends();
-  loadLLMConfig();
+  loadLLMKeys();
 }
 function closeSettingsModal() {
   settingsModal.classList.remove('open');
@@ -1169,7 +1169,7 @@ async function loadGenBackends() {
     const data = await resp.json();
     if (!data.success) { list.innerHTML = '<div class="key-empty">加载失败</div>'; return; }
     if (!data.any_configured) {
-      list.innerHTML = '<div class="key-empty">未配置任何生图后端 Key · 请设置环境变量后重启</div>';
+      list.innerHTML = '<div class="key-empty">未配置任何生图后端 Key · 请在「大模型 API」页配置</div>';
       return;
     }
     list.innerHTML = data.backends.map(b => {
@@ -1177,10 +1177,128 @@ async function loadGenBackends() {
       return `<div class="gen-backend-row"><span class="gen-backend-dot">${dot}</span>
         <span class="gen-backend-label">${escapeHtml(b.label)}</span></div>`;
     }).join('');
+    // 动态填充后端下拉框（保留 auto 选项）
+    const sel = document.getElementById('genBackend');
+    if (sel) {
+      const currentVal = sel.value || 'auto';
+      sel.innerHTML = '<option value="auto">自动（按优先级降级）</option>';
+      data.backends.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.id;
+        opt.textContent = b.label;
+        if (!b.available) opt.disabled = true;
+        sel.appendChild(opt);
+      });
+      sel.value = currentVal;
+    }
     // 默认后端下拉同步
     if (data.default_backend && genBackend) genBackend.value = data.default_backend;
   } catch (e) {
     list.innerHTML = '<div class="key-empty">加载失败</div>';
+  }
+}
+
+// LLM Key Store — 动态加载所有 provider 的 key 状态并渲染管理列表
+async function loadLLMKeys() {
+  const list = document.getElementById('llmKeyList');
+  if (!list) return;
+  try {
+    const resp = await apiFetch('/api/llm-keys');
+    const data = await resp.json();
+    if (!data.success) { list.innerHTML = '<div class="key-empty">加载失败</div>'; return; }
+    const providers = data.providers || [];
+    if (!providers.length) {
+      list.innerHTML = '<div class="key-empty">无可用 provider</div>';
+      return;
+    }
+    list.innerHTML = providers.map(p => {
+      const dot = p.has_key ? '✅' : '⚪';
+      const preview = p.key_masked ? ` · ${p.key_masked}` : '';
+      const uses = (p.uses || []).map(u => ({gen:'生图',vision:'图→prompt',optimize:'优化'}[u]||u)).join('、');
+      return `<div class="llm-key-item">
+        <div class="llm-key-header">
+          <span class="llm-key-dot">${dot}</span>
+          <span class="llm-key-label">${escapeHtml(p.label)}</span>
+          <span class="llm-key-uses">(${uses})</span>
+          <span class="llm-key-preview">${escapeHtml(preview)}</span>
+        </div>
+        <div class="llm-key-form">
+          <input type="password" id="llmKey_${escapeHtml(p.provider)}" class="key-input"
+            placeholder="${escapeHtml(p.key_prefix || 'API Key')}" />
+          <input type="text" id="llmBase_${escapeHtml(p.provider)}" class="key-input"
+            placeholder="Base URL（可选）" value="${escapeHtml(p.base_url || '')}" />
+          <div class="key-input-actions">
+            <button class="btn btn-small btn-secondary" id="llmSave_${escapeHtml(p.provider)}">保存</button>
+            <button class="btn btn-small btn-secondary" id="llmToggle_${escapeHtml(p.provider)}">显示</button>
+            ${p.has_key ? `<button class="btn btn-small btn-danger" id="llmRemove_${escapeHtml(p.provider)}">删除</button>` : ''}
+            <span class="settings-hint" id="llmHint_${escapeHtml(p.provider)}"></span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    // 绑定事件
+    providers.forEach(p => {
+      const saveBtn = document.getElementById('llmSave_'+p.provider);
+      const toggleBtn = document.getElementById('llmToggle_'+p.provider);
+      const removeBtn = document.getElementById('llmRemove_'+p.provider);
+      const keyInput = document.getElementById('llmKey_'+p.provider);
+      const baseInput = document.getElementById('llmBase_'+p.provider);
+      if (saveBtn) saveBtn.addEventListener('click', () => saveLLMKey(p.provider, keyInput, baseInput));
+      if (toggleBtn) toggleBtn.addEventListener('click', () => {
+        const isPwd = keyInput.type === 'password';
+        keyInput.type = isPwd ? 'text' : 'password';
+        toggleBtn.textContent = isPwd ? '隐藏' : '显示';
+      });
+      if (removeBtn) removeBtn.addEventListener('click', () => removeLLMKey(p.provider));
+    });
+  } catch (e) {
+    list.innerHTML = '<div class="key-empty">加载失败</div>';
+  }
+}
+
+async function saveLLMKey(provider, keyInput, baseInput) {
+  const key = (keyInput ? keyInput.value : '').trim();
+  const base = (baseInput ? baseInput.value : '').trim();
+  const hint = document.getElementById('llmHint_'+provider);
+  const payload = { provider, key };
+  if (base) payload.config = { base_url: base };
+  try {
+    const resp = await apiFetch('/api/llm-keys', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (data.success) {
+      if (hint) { hint.textContent = '✅ 已保存'; hint.style.color = 'var(--success)'; }
+      if (keyInput) keyInput.value = '';
+      setTimeout(() => { if (hint) hint.textContent = ''; }, 2500);
+      loadLLMKeys();
+      loadGenBackends();
+      loadVisionBackends();
+    } else {
+      if (hint) { hint.textContent = '❌ ' + (data.error || '保存失败'); hint.style.color = 'var(--error)'; }
+    }
+  } catch (e) {
+    if (hint) { hint.textContent = '❌ ' + fetchErrorMessage(e); hint.style.color = 'var(--error)'; }
+  }
+}
+
+async function removeLLMKey(provider) {
+  const hint = document.getElementById('llmHint_'+provider);
+  try {
+    const resp = await apiFetch('/api/llm-keys/'+provider, { method: 'DELETE' });
+    const data = await resp.json();
+    if (data.success) {
+      if (hint) { hint.textContent = '✅ 已删除'; hint.style.color = 'var(--success)'; }
+      setTimeout(() => { if (hint) hint.textContent = ''; }, 2500);
+      loadLLMKeys();
+      loadGenBackends();
+      loadVisionBackends();
+    } else {
+      if (hint) { hint.textContent = '❌ ' + (data.error || '删除失败'); hint.style.color = 'var(--error)'; }
+    }
+  } catch (e) {
+    if (hint) { hint.textContent = '❌ ' + fetchErrorMessage(e); hint.style.color = 'var(--error)'; }
   }
 }
 
@@ -1204,65 +1322,6 @@ async function loadVisionBackends() {
   } catch (e) {
     list.innerHTML = '<div class="key-empty">加载失败</div>';
   }
-}
-
-// 大模型 API 配置加载
-async function loadLLMConfig() {
-  try {
-    const resp = await apiFetch('/api/config/llm');
-    const data = await resp.json();
-    if (!data.success) return;
-    const oaiKey = document.getElementById('openaiKeyInput');
-    const oaiBase = document.getElementById('openaiBaseInput');
-    const cldKey = document.getElementById('claudeKeyInput');
-    const cldBase = document.getElementById('claudeBaseInput');
-    if (oaiKey) oaiKey.placeholder = data.openai.key_set
-      ? '已配置：' + data.openai.key
-      : 'sk-xxxxxxxx（可选，留空则用环境变量 OPENAI_API_KEY）';
-    if (oaiBase) oaiBase.value = data.openai.base_url || '';
-    if (cldKey) cldKey.placeholder = data.claude.key_set
-      ? '已配置：' + data.claude.key
-      : 'sk-ant-xxxxxxxx（可选，留空则用环境变量 ANTHROPIC_API_KEY）';
-    if (cldBase) cldBase.value = data.claude.base_url || '';
-    loadVisionBackends();
-  } catch (e) { /* 静默失败 */ }
-}
-
-// 通用 Key 输入框保存/显示/隐藏
-function setupKeyInput(keyId, baseId, saveField, baseField) {
-  const keyInput = document.getElementById(keyId);
-  const baseInput = document.getElementById(baseId);
-  const saveBtn = document.getElementById(keyId.replace('Input', 'SaveBtn'));
-  const toggleBtn = document.getElementById(keyId.replace('Input', 'Toggle'));
-  const hint = document.getElementById(keyId.replace('Input', 'Hint'));
-  if (!keyInput || !saveBtn) return;
-  saveBtn.addEventListener('click', async () => {
-    const payload = {};
-    payload[saveField] = keyInput.value.trim();
-    if (baseInput) payload[baseField] = baseInput.value.trim();
-    try {
-      const resp = await apiFetch('/api/config/llm', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await resp.json();
-      if (data.success) {
-        hint.textContent = '✅ 已保存'; hint.style.color = 'var(--success)';
-        keyInput.value = ''; loadVisionBackends();
-        setTimeout(() => { hint.textContent = ''; }, 2500);
-      } else {
-        hint.textContent = '❌ ' + (data.error || '保存失败');
-        hint.style.color = 'var(--error)';
-      }
-    } catch (e) {
-      hint.textContent = '❌ ' + fetchErrorMessage(e); hint.style.color = 'var(--error)';
-    }
-  });
-  toggleBtn.addEventListener('click', () => {
-    const isPwd = keyInput.type === 'password';
-    keyInput.type = isPwd ? 'text' : 'password';
-    toggleBtn.textContent = isPwd ? '隐藏' : '显示';
-  });
 }
 
 // MCP API Key（存 localStorage）
@@ -1590,10 +1649,8 @@ if (genTplSelect && !genTplSelect.value) {
 }
 
 // ============================================================
-// 设置页初始化：大模型 API + MCP Key
+// 设置页初始化：MCP Key
 // ============================================================
-setupKeyInput('openaiKeyInput', 'openaiBaseInput', 'openai_key', 'openai_base');
-setupKeyInput('claudeKeyInput', 'claudeBaseInput', 'claude_key', 'claude_base');
 setupMcpApiKey();
 
 // ============================================================

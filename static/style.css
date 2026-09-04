@@ -1595,3 +1595,29 @@ body {
   color: var(--ink);
   font-size: 11px;
 }
+
+/* LLM Key Store */
+.llm-key-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.llm-key-item {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--canvas);
+  padding: 12px;
+}
+.llm-key-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.llm-key-dot { font-size: 14px; }
+.llm-key-label { color: var(--ink); font-weight: 550; }
+.llm-key-uses { color: var(--muted); font-size: 11px; }
+.llm-key-preview { color: var(--muted); font-size: 11px; margin-left: auto; font-family: 'JetBrains Mono', ui-monospace, monospace; }
+.llm-key-form { display: flex; flex-direction: column; gap: 6px; }
+.llm-key-form .key-input { font-size: 12px; }

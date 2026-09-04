@@ -36,6 +36,7 @@ hiddenimports = [
     "prompt_optimizer",
     "services", "services.color_delta_e", "services.color_pdf",
     "colorflow_keys",
+    "llm_keys",
     "colorflow_sdk", "colorflow_sdk.exceptions",
     "mcp_print", "mcp_print.tools.colors", "mcp_print.tools.cost", "mcp_print.tools",
     "rembg",

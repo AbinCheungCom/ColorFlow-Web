@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -28,9 +28,9 @@
 </head>
 <body>
   <div class="app">
-    <!-- Mobile topbar (≤960px only) -->
+    <!-- Mobile topbar (鈮?60px only) -->
     <div class="mobilebar">
-      <button class="icon-btn" id="sidebarToggle" aria-label="打开菜单">
+      <button class="icon-btn" id="sidebarToggle" aria-label="鎵撳紑鑿滃崟">
         <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true"><path d="M2.5 5h13M2.5 9h13M2.5 13h13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>
       </button>
       <div class="logo">
@@ -45,7 +45,7 @@
     </div>
     <div class="scrim" id="scrim"></div>
 
-    <!-- Left sidebar: LOGO + 工具导航 + 设置 + footer（DeepSeek Harness 式 app shell） -->
+    <!-- Left sidebar: LOGO + 宸ュ叿瀵艰埅 + 璁剧疆 + footer锛圖eepSeek Harness 寮?app shell锛?-->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-head">
         <div class="logo">
@@ -57,43 +57,42 @@
           </svg>
           <span class="logo-text">ColorFlow</span>
         </div>
-        <button class="icon-btn sidebar-close" id="sidebarClose" aria-label="关闭菜单">
+        <button class="icon-btn sidebar-close" id="sidebarClose" aria-label="鍏抽棴鑿滃崟">
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>
         </button>
       </div>
 
-      <nav class="sidebar-nav" aria-label="工具">
-        <div class="sidebar-label">工具 · Tools</div>
+      <nav class="sidebar-nav" aria-label="宸ュ叿">
+        <div class="sidebar-label">宸ュ叿 路 Tools</div>
         <button class="tab active" data-tab="trace">
           <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 13 5l-1.5 7h-7L3 5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="8" cy="8" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 9.6v4.9" stroke="currentColor" stroke-width="1.4"/></svg>
-          矢量描图
+          鐭㈤噺鎻忓浘
         </button>
         <button class="tab" data-tab="cutout">
           <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="12.5" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="12.5" cy="12.5" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 11 12.5 3.5M11 11 3.5 3.5M12.5 12.5 7 6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-          位图抠图
+          浣嶅浘鎶犲浘
         </button>
         <button class="tab" data-tab="pantone">
           <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="1.5" width="10" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="5" y="3.5" width="6" height="5" rx="0.8" fill="currentColor" stroke="none"/><path d="M5 11.5h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-          Pantone 查色
+          Pantone 鏌ヨ壊
         </button>
         <button class="tab" data-tab="match">
           <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="8" r="4.2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="10" cy="8" r="4.2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
-          色彩匹配
+          鑹插僵鍖归厤
         </button>
         <button class="tab" data-tab="greyscale3d">
           <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 14L14.5 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/><rect x="1.5" y="6" width="4" height="8" fill="currentColor"/><rect x="6" y="4" width="4" height="10" fill="currentColor" opacity="0.6"/><rect x="10.5" y="2" width="4" height="12" fill="currentColor" opacity="0.35"/></svg>
-          3D 灰度图
-        </button>
+          3D 鐏板害鍥?        </button>
         <button class="tab" data-tab="generate">
           <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.8 4.2 4.2.3-3.3 2.7 1.1 4.1L8 11.5 4.2 13.4l1.1-4.1L2 6.6l4.2-.3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
-          AI 生图
+          AI 鐢熷浘
         </button>
       </nav>
 
       <footer class="sidebar-footer">
-        <span>ColorFlow</span> ·
+        <span>ColorFlow</span> 路
         <a href="https://github.com/Abinius/ColorFlow" target="_blank">GitHub</a>
-        <button class="icon-btn settings-icon" id="settingsToggle" aria-label="打开设置">
+        <button class="icon-btn settings-icon" id="settingsToggle" aria-label="鎵撳紑璁剧疆">
           <svg viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true">
             <circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/>
             <path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -107,18 +106,18 @@
       <div class="settings-modal-backdrop" id="settingsBackdrop"></div>
       <div class="settings-modal-container">
         <div class="settings-modal-header">
-          <h2>设置</h2>
-          <button class="icon-btn" id="settingsClose" aria-label="关闭设置">
+          <h2>璁剧疆</h2>
+          <button class="icon-btn" id="settingsClose" aria-label="鍏抽棴璁剧疆">
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>
           </button>
         </div>
         <div class="settings-modal-body">
-          <!-- 左侧导航栏 -->
+          <!-- 宸︿晶瀵艰埅鏍?-->
           <nav class="settings-nav">
             <div class="settings-nav-group">
               <button class="settings-nav-item active" data-nav="general">
                 <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 1a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" fill="currentColor"/><path d="M6.5 1.5l-.5 1.2-1.3.3-.8-1L2.5 3l.3 1.3-1 .8-1.2-.5L0 6l1.2.5.5 1.2-.3 1.3-1 .8L1 11l1.3-.3.8 1 1.2-.5.5-1.2 1.3-.3.8 1L7 14.5l.5-1.2 1.3-.3.8 1L11 13l-.3-1.3 1-.8 1.2.5L14 10l-1.2-.5-.5-1.2.3-1.3 1-.8L13 5l-1.3.3-.8-1-1.2.5-.5 1.2-1.3.3-.8-1L7 1.5z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
-                通用
+                閫氱敤
               </button>
               <button class="settings-nav-item" data-nav="apikey">
                 <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="5" width="10" height="8" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M5 5V3.5a1.5 1.5 0 0 1 3 0V5M12 8h1.5a1.5 1.5 0 0 1 0 3H12M14.5 5.5L15.2 4.8a.8.8 0 0 1 1.1 1.1l-.7.7M15.2 11.2l.7.7a.8.8 0 0 1-1.1 1.1l-.7-.7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
@@ -126,78 +125,78 @@
               </button>
               <button class="settings-nav-item" data-nav="mcp">
                 <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2h10v4H3zM3 8h4v4H3zM9 8h4v4H9z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-                MCP 接入
+                MCP 鎺ュ叆
               </button>
               <button class="settings-nav-item" data-nav="gen">
                 <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.8 4.2 4.2.3-3.3 2.7 1.1 4.1L8 11.5 4.2 13.4l1.1-4.1L2 6.6l4.2-.3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
-                生图后端
+                鐢熷浘鍚庣
               </button>
               <button class="settings-nav-item" data-nav="llm">
                 <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="5" cy="5" r="3" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="11" cy="11" r="3" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M7.5 7.5 8.5 8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-                大模型 API
+                澶фā鍨?API
               </button>
             </div>
           </nav>
-          <!-- 右侧内容区 -->
+          <!-- 鍙充晶鍐呭鍖?-->
           <div class="settings-content">
             <div class="settings-page active" id="nav-general">
               <div class="settings-section">
-                <p class="settings-desc">重新启动 ColorFlow 服务（杀掉旧进程，拉起新实例）</p>
+                <p class="settings-desc">閲嶆柊鍚姩 ColorFlow 鏈嶅姟锛堟潃鎺夋棫杩涚▼锛屾媺璧锋柊瀹炰緥锛?/p>
                 <button class="btn btn-primary settings-action-btn" id="restartBtn">
                   <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5A5 5 0 0 1 11.5 4 5 5 0 0 1 13 8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13 4v3.5h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 12v-3.5h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  重启服务
+                  閲嶅惎鏈嶅姟
                 </button>
                 <p class="settings-hint" id="restartHint"></p>
               </div>
               <div class="settings-section">
-                <p class="settings-desc">清除浏览器本地保存的 API Key</p>
-                <button class="btn btn-small btn-secondary settings-action-btn" id="clearApiKeyBtn">清除本地 Key</button>
+                <p class="settings-desc">娓呴櫎娴忚鍣ㄦ湰鍦颁繚瀛樼殑 API Key</p>
+                <button class="btn btn-small btn-secondary settings-action-btn" id="clearApiKeyBtn">娓呴櫎鏈湴 Key</button>
               </div>
             </div>
             <div class="settings-page" id="nav-apikey">
               <div class="settings-section">
-                <p class="settings-desc">生成 Key 后，前端请求和 MCP 接入共用同一把钥匙</p>
-                <button class="btn btn-primary settings-action-btn" id="generateKeyBtn">+ 生成新 Key</button>
+                <p class="settings-desc">鐢熸垚 Key 鍚庯紝鍓嶇璇锋眰鍜?MCP 鎺ュ叆鍏辩敤鍚屼竴鎶婇挜鍖?/p>
+                <button class="btn btn-primary settings-action-btn" id="generateKeyBtn">+ 鐢熸垚鏂?Key</button>
               </div>
               <div class="key-list" id="keyList">
-                <div class="key-empty">暂无 Key</div>
+                <div class="key-empty">鏆傛棤 Key</div>
               </div>
               <div class="key-modal hidden" id="keyModal">
                 <div class="key-modal-box">
-                  <div class="key-modal-title">✅ Key 已生成（仅显示一次）</div>
+                  <div class="key-modal-title">鉁?Key 宸茬敓鎴愶紙浠呮樉绀轰竴娆★級</div>
                   <input type="text" id="newKeyDisplay" class="key-display-input" readonly />
-                  <button class="btn btn-small btn-primary" id="copyNewKeyBtn">复制 Key</button>
-                  <div class="key-modal-hint">MCP 配置已自动填充 → 「MCP 接入」标签可直接复制</div>
+                  <button class="btn btn-small btn-primary" id="copyNewKeyBtn">澶嶅埗 Key</button>
+                  <div class="key-modal-hint">MCP 閰嶇疆宸茶嚜鍔ㄥ～鍏?鈫?銆孧CP 鎺ュ叆銆嶆爣绛惧彲鐩存帴澶嶅埗</div>
                 </div>
               </div>
             </div>
             <div class="settings-page" id="nav-mcp">
               <div class="settings-section">
-                <p class="settings-desc">复制下方 JSON 到 Claude Code / Cursor 的 .mcp.json</p>
+                <p class="settings-desc">澶嶅埗涓嬫柟 JSON 鍒?Claude Code / Cursor 鐨?.mcp.json</p>
                 <pre class="mcp-config-block" id="mcpConfig">{
   "mcpServers": {
     "colorflow": {
       "command": "python",
       "args": ["mcp_server.py"],
       "env": {
-        "COLORFLOW_API_KEY": "（请先生成 Key）"
+        "COLORFLOW_API_KEY": "锛堣鍏堢敓鎴?Key锛?
       }
     }
   }
 }</pre>
-                <button class="btn btn-small btn-primary" id="copyMcpConfigBtn">复制配置</button>
+                <button class="btn btn-small btn-primary" id="copyMcpConfigBtn">澶嶅埗閰嶇疆</button>
               </div>
               <div class="settings-section">
-                <p class="settings-desc">MCP API Key（用于 MCP Server 鉴权，与 API Key 标签生成的 Key 共用）</p>
-                <input type="password" id="mcpApiKeyInput" class="key-input" placeholder="cfk_xxxxxxxx（可选，留空则 MCP 无鉴权）" />
+                <p class="settings-desc">MCP API Key锛堢敤浜?MCP Server 閴存潈锛屼笌 API Key 鏍囩鐢熸垚鐨?Key 鍏辩敤锛?/p>
+                <input type="password" id="mcpApiKeyInput" class="key-input" placeholder="cfk_xxxxxxxx锛堝彲閫夛紝鐣欑┖鍒?MCP 鏃犻壌鏉冿級" />
                 <div class="key-input-actions">
-                  <button class="btn btn-small btn-secondary" id="mcpApiKeySaveBtn">保存</button>
-                  <button class="btn btn-small btn-secondary" id="mcpApiKeyToggle">显示</button>
+                  <button class="btn btn-small btn-secondary" id="mcpApiKeySaveBtn">淇濆瓨</button>
+                  <button class="btn btn-small btn-secondary" id="mcpApiKeyToggle">鏄剧ず</button>
                   <span class="settings-hint" id="mcpApiKeyHint"></span>
                 </div>
               </div>
               <div class="settings-section">
-                <p class="settings-desc">可用工具（16 个）</p>
+                <p class="settings-desc">鍙敤宸ュ叿锛?6 涓級</p>
                 <div class="mcp-tools-list">
                   <span class="mcp-tool-tag">trace_image</span>
                   <span class="mcp-tool-tag">cutout</span>
@@ -220,56 +219,55 @@
             </div>
             <div class="settings-page" id="nav-gen">
               <div class="settings-section">
-                <p class="settings-desc">生图后端按 Key 自动发现，backend=auto 按优先级降级</p>
+                <p class="settings-desc">鐢熷浘鍚庣鎸?Key 鑷姩鍙戠幇锛宐ackend=auto 鎸変紭鍏堢骇闄嶇骇</p>
                 <div class="gen-backends-list" id="genBackendsList">
-                  <div class="key-empty">加载中...</div>
+                  <div class="key-empty">鍔犺浇涓?..</div>
                 </div>
               </div>
               <div class="settings-section">
-                <p class="settings-desc">配置环境变量后重启服务生效（Key 仅存服务端，不进前端）</p>
+                <p class="settings-desc">閰嶇疆鐜鍙橀噺鍚庨噸鍚湇鍔＄敓鏁堬紙Key 浠呭瓨鏈嶅姟绔紝涓嶈繘鍓嶇锛?/p>
                 <div class="gen-env-hint">
-                  <code>VOLCANO_API_KEY</code> · 火山方舟（国内默认）<br/>
-                  <code>FAL_KEY</code> · fal.ai（海外）<br/>
-                  <code>COMFYUI_URL</code> · 本地 ComfyUI（可选装）
-                </div>
+                  <code>VOLCANO_API_KEY</code> 路 鐏北鏂硅垷锛堝浗鍐呴粯璁わ級<br/>
+                  <code>FAL_KEY</code> 路 fal.ai锛堟捣澶栵級<br/>
+                  <code>COMFYUI_URL</code> 路 鏈湴 ComfyUI锛堝彲閫夎锛?                </div>
               </div>
             </div>
             <div class="settings-page" id="nav-llm">
               <div class="settings-section">
-                <p class="settings-desc">大模型 API 用于「图→prompt」反向闭环（Vision 后端），配置后自动启用 openai / claude</p>
+                <p class="settings-desc">澶фā鍨?API 鐢ㄤ簬銆屽浘鈫抪rompt銆嶅弽鍚戦棴鐜紙Vision 鍚庣锛夛紝閰嶇疆鍚庤嚜鍔ㄥ惎鐢?openai / claude</p>
                 <div class="gen-backends-list" id="visionBackendsList">
-                  <div class="key-empty">加载中...</div>
+                  <div class="key-empty">鍔犺浇涓?..</div>
                 </div>
               </div>
               <div class="settings-section">
-                <p class="settings-desc">OpenAI Vision（gpt-4o）</p>
-                <input type="password" id="openaiKeyInput" class="key-input" placeholder="sk-xxxxxxxx（可选，留空则用环境变量 OPENAI_API_KEY）" />
-                <input type="text" id="openaiBaseInput" class="key-input" placeholder="Base URL（可选，默认 https://api.openai.com/v1）" style="margin-top:6px" />
+                <p class="settings-desc">OpenAI Vision锛坓pt-4o锛?/p>
+                <input type="password" id="openaiKeyInput" class="key-input" placeholder="sk-xxxxxxxx锛堝彲閫夛紝鐣欑┖鍒欑敤鐜鍙橀噺 OPENAI_API_KEY锛? />
+                <input type="text" id="openaiBaseInput" class="key-input" placeholder="Base URL锛堝彲閫夛紝榛樿 https://api.openai.com/v1锛? style="margin-top:6px" />
                 <div class="key-input-actions">
-                  <button class="btn btn-small btn-secondary" id="openaiKeySaveBtn">保存</button>
-                  <button class="btn btn-small btn-secondary" id="openaiKeyToggle">显示</button>
+                  <button class="btn btn-small btn-secondary" id="openaiKeySaveBtn">淇濆瓨</button>
+                  <button class="btn btn-small btn-secondary" id="openaiKeyToggle">鏄剧ず</button>
                   <span class="settings-hint" id="openaiKeyHint"></span>
                 </div>
               </div>
               <div class="settings-section">
-                <p class="settings-desc">Anthropic Claude（备选 VLM）</p>
-                <input type="password" id="claudeKeyInput" class="key-input" placeholder="sk-ant-xxxxxxxx（可选，留空则用环境变量 ANTHROPIC_API_KEY）" />
-                <input type="text" id="claudeBaseInput" class="key-input" placeholder="Base URL（可选，默认 https://api.anthropic.com）" style="margin-top:6px" />
+                <p class="settings-desc">Anthropic Claude锛堝閫?VLM锛?/p>
+                <input type="password" id="claudeKeyInput" class="key-input" placeholder="sk-ant-xxxxxxxx锛堝彲閫夛紝鐣欑┖鍒欑敤鐜鍙橀噺 ANTHROPIC_API_KEY锛? />
+                <input type="text" id="claudeBaseInput" class="key-input" placeholder="Base URL锛堝彲閫夛紝榛樿 https://api.anthropic.com锛? style="margin-top:6px" />
                 <div class="key-input-actions">
-                  <button class="btn btn-small btn-secondary" id="claudeKeySaveBtn">保存</button>
-                  <button class="btn btn-small btn-secondary" id="claudeKeyToggle">显示</button>
+                  <button class="btn btn-small btn-secondary" id="claudeKeySaveBtn">淇濆瓨</button>
+                  <button class="btn btn-small btn-secondary" id="claudeKeyToggle">鏄剧ず</button>
                   <span class="settings-hint" id="claudeKeyHint"></span>
                 </div>
               </div>
               <div class="settings-section">
-                <p class="settings-desc">未配置真实 Key 时自动降级 mock（不报错，meta.fallback_from 记录来源）</p>
+                <p class="settings-desc">鏈厤缃湡瀹?Key 鏃惰嚜鍔ㄩ檷绾?mock锛堜笉鎶ラ敊锛宮eta.fallback_from 璁板綍鏉ユ簮锛?/p>
                 <div class="gen-env-hint">
-                  <code>OPENAI_API_KEY</code> · OpenAI Vision（gpt-4o，默认）<br/>
-                  <code>ANTHROPIC_API_KEY</code> · Anthropic Claude（备选）<br/>
-                  <code>VISION_MODEL_OPENAI</code> · 模型名（默认 gpt-4o）<br/>
-                  <code>VISION_MODEL_CLAUDE</code> · 模型名（默认 claude-sonnet-4-6）<br/>
-                  <code>OPENAI_BASE_URL</code> · 兼容代理（Azure/OpenRouter）<br/>
-                  <code>ANTHROPIC_BASE_URL</code> · 兼容代理
+                  <code>OPENAI_API_KEY</code> 路 OpenAI Vision锛坓pt-4o锛岄粯璁わ級<br/>
+                  <code>ANTHROPIC_API_KEY</code> 路 Anthropic Claude锛堝閫夛級<br/>
+                  <code>VISION_MODEL_OPENAI</code> 路 妯″瀷鍚嶏紙榛樿 gpt-4o锛?br/>
+                  <code>VISION_MODEL_CLAUDE</code> 路 妯″瀷鍚嶏紙榛樿 claude-sonnet-4-6锛?br/>
+                  <code>OPENAI_BASE_URL</code> 路 鍏煎浠ｇ悊锛圓zure/OpenRouter锛?br/>
+                  <code>ANTHROPIC_BASE_URL</code> 路 鍏煎浠ｇ悊
                 </div>
               </div>
             </div>
@@ -281,12 +279,12 @@
     <!-- Right workspace -->
     <main class="workspace">
       <div class="main">
-        <!-- Tab: Cutout (位图抠图) -->
+        <!-- Tab: Cutout (浣嶅浘鎶犲浘) -->
         <section class="tab-content" id="tab-cutout">
           <div class="card">
             <div class="card-header">
-              <h2>位图抠图</h2>
-              <p class="card-desc">上传图片，AI 自动移除背景，输出透明 PNG</p>
+              <h2>浣嶅浘鎶犲浘</h2>
+              <p class="card-desc">涓婁紶鍥剧墖锛孉I 鑷姩绉婚櫎鑳屾櫙锛岃緭鍑洪€忔槑 PNG</p>
             </div>
             <div class="trace-layout">
               <div class="trace-input">
@@ -294,72 +292,72 @@
                   <input type="file" id="cutoutFile" accept="image/*" hidden />
                   <div class="upload-placeholder">
                     <svg class="upload-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="56" height="56" aria-hidden="true"><path fill="currentColor" d="M853.344 341.344C853.344 294.4 814.944 256 768 256s-85.344 38.4-85.344 85.344 38.4 85.344 85.344 85.344 85.344-38.4 85.344-85.344z"/><path fill="currentColor" d="M0 85.344v853.344h512v-85.344H85.344V742.4l256-256L512 657.056l59.744-59.744-230.4-230.4-256 256V170.656h853.344v298.656l85.344 85.344V85.312z"/><path fill="currentColor" d="M951.456 840.544L1011.2 780.8l-200.544-200.544-200.544 200.544 59.744 59.744L768 742.4v238.944h85.344V742.4z"/></svg>
-                    <div class="upload-text">点击上传或拖拽图片</div>
-                    <div class="upload-hint">PNG / JPG / WebP · 最大 10MB</div>
+                    <div class="upload-text">鐐瑰嚮涓婁紶鎴栨嫋鎷藉浘鐗?/div>
+                    <div class="upload-hint">PNG / JPG / WebP 路 鏈€澶?10MB</div>
                   </div>
                   <img id="cutoutPreviewImg" class="preview-img hidden" />
                 </div>
                 <div class="params cutout-params">
                   <div class="param-row">
-                    <label>抠图模型</label>
+                    <label>鎶犲浘妯″瀷</label>
                     <select id="cutoutModel">
-                      <option value="silueta">通用快速（默认）</option>
-                      <option value="u2net_human_seg">人像精细</option>
+                      <option value="silueta">閫氱敤蹇€燂紙榛樿锛?/option>
+                      <option value="u2net_human_seg">浜哄儚绮剧粏</option>
                     </select>
                   </div>
                   <div class="param-row param-row-checkbox">
                     <label class="checkbox-row">
                       <input type="checkbox" id="cutoutAdvancedToggle" />
-                      <span>展开高级设置</span>
+                      <span>灞曞紑楂樼骇璁剧疆</span>
                     </label>
                   </div>
                   <div class="advanced-params hidden" id="cutoutAdvanced">
                     <div class="param-row param-row-checkbox">
                       <label class="checkbox-row">
                         <input type="checkbox" id="cutoutAlphaMatting" />
-                        <span>精细抠边（发丝/半透明）</span>
+                        <span>绮剧粏鎶犺竟锛堝彂涓?鍗婇€忔槑锛?/span>
                       </label>
                     </div>
                     <div class="am-thresholds hidden" id="cutoutAMThresholds">
                       <div class="param-row">
-                        <label>前景阈值: <span id="cutoutAMFGVal">240</span></label>
+                        <label>鍓嶆櫙闃堝€? <span id="cutoutAMFGVal">240</span></label>
                         <input type="range" id="cutoutAMFG" min="10" max="255" value="240" />
                       </div>
                       <div class="param-row">
-                        <label>背景阈值: <span id="cutoutAMBGVal">10</span></label>
+                        <label>鑳屾櫙闃堝€? <span id="cutoutAMBGVal">10</span></label>
                         <input type="range" id="cutoutAMBG" min="0" max="245" value="10" />
                       </div>
                       <div class="param-row">
-                        <label>腐蚀大小: <span id="cutoutAMErodeVal">10</span></label>
+                        <label>鑵愯殌澶у皬: <span id="cutoutAMErodeVal">10</span></label>
                         <input type="range" id="cutoutAMErode" min="1" max="20" value="10" />
                       </div>
                     </div>
                     <div class="param-row param-row-checkbox">
                       <label class="checkbox-row">
                         <input type="checkbox" id="cutoutDecontaminate" />
-                        <span>清除边缘色晕</span>
+                        <span>娓呴櫎杈圭紭鑹叉檿</span>
                       </label>
                     </div>
                     <div class="param-row param-row-checkbox">
                       <label class="checkbox-row">
                         <input type="checkbox" id="cutoutPostProcess" />
-                        <span>二值掩码去噪</span>
+                        <span>浜屽€兼帺鐮佸幓鍣?/span>
                       </label>
                     </div>
                   </div>
                 </div>
                 <button class="btn btn-primary" id="cutoutBtn" disabled>
-                  <span class="btn-text">开始抠图</span>
-                  <span class="btn-loader hidden">抠图中...</span>
+                  <span class="btn-text">寮€濮嬫姞鍥?/span>
+                  <span class="btn-loader hidden">鎶犲浘涓?..</span>
                 </button>
               </div>
               <div class="trace-output">
                 <div class="svg-preview cutout-preview" id="cutoutPreview">
-                  <div class="svg-placeholder">等待抠图...</div>
+                  <div class="svg-placeholder">绛夊緟鎶犲浘...</div>
                 </div>
                 <div class="svg-info hidden" id="cutoutInfo">
                   <span class="svg-size" id="cutoutSize"></span>
-                  <button class="btn btn-small" id="cutoutDownload">下载透明 PNG</button>
+                  <button class="btn btn-small" id="cutoutDownload">涓嬭浇閫忔槑 PNG</button>
                 </div>
               </div>
             </div>
@@ -370,153 +368,153 @@
         <section class="tab-content active" id="tab-trace">
           <div class="card">
             <div class="card-header">
-              <h2>位图 → SVG 矢量描图</h2>
-              <p class="card-desc">上传图片，AI 自动识别路径转换为矢量 SVG</p>
+              <h2>浣嶅浘 鈫?SVG 鐭㈤噺鎻忓浘</h2>
+              <p class="card-desc">涓婁紶鍥剧墖锛孉I 鑷姩璇嗗埆璺緞杞崲涓虹煝閲?SVG</p>
             </div>
             <div class="trace-layout">
               <div class="trace-input">
-                <!-- 描图 / 抠图 模式切换（醒目入口） -->
+                <!-- 鎻忓浘 / 鎶犲浘 妯″紡鍒囨崲锛堥啋鐩叆鍙ｏ級 -->
                 <div class="mode-switch">
-                  <button class="mode-btn active" data-mode="color">矢量描图</button>
-                  <button class="mode-btn" data-mode="cutout">抠图去背景</button>
+                  <button class="mode-btn active" data-mode="color">鐭㈤噺鎻忓浘</button>
+                  <button class="mode-btn" data-mode="cutout">鎶犲浘鍘昏儗鏅?/button>
                 </div>
                 <div class="upload-zone" id="uploadZone">
                   <input type="file" id="traceFile" accept="image/*" hidden />
                   <div class="upload-placeholder">
                     <svg class="upload-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="56" height="56" aria-hidden="true"><path fill="currentColor" d="M853.344 341.344C853.344 294.4 814.944 256 768 256s-85.344 38.4-85.344 85.344 38.4 85.344 85.344 85.344 85.344-38.4 85.344-85.344z"/><path fill="currentColor" d="M0 85.344v853.344h512v-85.344H85.344V742.4l256-256L512 657.056l59.744-59.744-230.4-230.4-256 256V170.656h853.344v298.656l85.344 85.344V85.312z"/><path fill="currentColor" d="M951.456 840.544L1011.2 780.8l-200.544-200.544-200.544 200.544 59.744 59.744L768 742.4v238.944h85.344V742.4z"/></svg>
-                    <div class="upload-text">点击上传或拖拽图片</div>
-                    <div class="upload-hint">PNG / JPG / WebP · 最大 10MB</div>
+                    <div class="upload-text">鐐瑰嚮涓婁紶鎴栨嫋鎷藉浘鐗?/div>
+                    <div class="upload-hint">PNG / JPG / WebP 路 鏈€澶?10MB</div>
                   </div>
                   <img id="previewImg" class="preview-img hidden" />
                 </div>
                 <div class="params">
                   <div class="param-row">
-                    <label>描图模式</label>
+                    <label>鎻忓浘妯″紡</label>
                     <select id="traceMode">
-                      <option value="color" selected>彩色</option>
-                      <option value="grey">灰度</option>
-                      <option value="human">人像</option>
-                      <option value="cutout">抠图</option>
+                      <option value="color" selected>褰╄壊</option>
+                      <option value="grey">鐏板害</option>
+                      <option value="human">浜哄儚</option>
+                      <option value="cutout">鎶犲浘</option>
                     </select>
                   </div>
                   <div class="param-row">
-                    <label>颜色深度</label>
+                    <label>棰滆壊娣卞害</label>
                     <select id="traceColormode">
-                      <option value="rgb8" selected>RGB 8-bit（默认）</option>
+                      <option value="rgb8" selected>RGB 8-bit锛堥粯璁わ級</option>
                       <option value="rgb16">RGB 16-bit</option>
-                      <option value="mono">二值化</option>
-                      <option value="grey">8-bit 灰度</option>
-                      <option value="grey16">16-bit 灰度</option>
+                      <option value="mono">浜屽€煎寲</option>
+                      <option value="grey">8-bit 鐏板害</option>
+                      <option value="grey16">16-bit 鐏板害</option>
                     </select>
                   </div>
                   <div class="param-row">
-                    <label>输出层级</label>
+                    <label>杈撳嚭灞傜骇</label>
                     <select id="traceHierarchical">
-                      <option value="stacked" selected>堆叠</option>
-                      <option value="flat">平面化</option>
+                      <option value="stacked" selected>鍫嗗彔</option>
+                      <option value="flat">骞抽潰鍖?/option>
                     </select>
                   </div>
                   <div class="param-row">
-                    <label>颜色精度: <span id="colorPrecisionVal">6</span></label>
+                    <label>棰滆壊绮惧害: <span id="colorPrecisionVal">6</span></label>
                     <input type="range" id="colorPrecision" min="1" max="16" value="6" />
                   </div>
                   <div class="param-row">
-                    <label>图层距离: <span id="layerDifferenceVal">64</span></label>
+                    <label>鍥惧眰璺濈: <span id="layerDifferenceVal">64</span></label>
                     <input type="range" id="layerDifference" min="1" max="128" value="64" />
                   </div>
                   <div class="param-row">
-                    <label>角点阈值: <span id="cornerThresholdVal">60</span></label>
+                    <label>瑙掔偣闃堝€? <span id="cornerThresholdVal">60</span></label>
                     <input type="range" id="cornerThreshold" min="1" max="180" value="60" />
                   </div>
                   <div class="param-row">
-                    <label>最小路径: <span id="lengthThresholdVal">2.0</span></label>
+                    <label>鏈€灏忚矾寰? <span id="lengthThresholdVal">2.0</span></label>
                     <input type="range" id="lengthThreshold" min="0.1" max="10" step="0.1" value="2.0" />
                   </div>
                   <div class="param-row">
-                    <label>斑点过滤: <span id="speckleVal">4</span></label>
+                    <label>鏂戠偣杩囨护: <span id="speckleVal">4</span></label>
                     <input type="range" id="filterSpeckle" min="1" max="100" value="4" />
                   </div>
                   <div class="param-row">
-                    <label>路径精度: <span id="precisionVal">7</span></label>
+                    <label>璺緞绮惧害: <span id="precisionVal">7</span></label>
                     <input type="range" id="pathPrecision" min="1" max="16" value="7" />
                   </div>
                   <div class="param-row param-row-checkbox">
                     <label class="checkbox-row">
                       <input type="checkbox" id="ignoreWhite" />
-                      <span>输出透明背景</span>
+                      <span>杈撳嚭閫忔槑鑳屾櫙</span>
                     </label>
-                    <span class="param-hint">去除白底，留透明通道</span>
+                    <span class="param-hint">鍘婚櫎鐧藉簳锛岀暀閫忔槑閫氶亾</span>
                   </div>
                   <div class="cutout-params-trace hidden" id="traceCutoutParams">
                     <div class="param-row">
-                      <label>抠图模型</label>
+                      <label>鎶犲浘妯″瀷</label>
                       <select id="traceCutoutModel">
-                        <option value="silueta">通用快速（默认）</option>
-                        <option value="u2net_human_seg">人像精细</option>
+                        <option value="silueta">閫氱敤蹇€燂紙榛樿锛?/option>
+                        <option value="u2net_human_seg">浜哄儚绮剧粏</option>
                       </select>
                     </div>
                     <div class="param-row param-row-checkbox">
                       <label class="checkbox-row">
                         <input type="checkbox" id="traceCutoutAM" />
-                        <span>精细抠边（发丝/半透明）</span>
+                        <span>绮剧粏鎶犺竟锛堝彂涓?鍗婇€忔槑锛?/span>
                       </label>
                     </div>
                     <div class="am-thresholds hidden" id="traceCutoutAMThresholds">
                       <div class="param-row">
-                        <label>前景阈值: <span id="traceCutoutAMFGVal">240</span></label>
+                        <label>鍓嶆櫙闃堝€? <span id="traceCutoutAMFGVal">240</span></label>
                         <input type="range" id="traceCutoutAMFG" min="10" max="255" value="240" />
                       </div>
                       <div class="param-row">
-                        <label>背景阈值: <span id="traceCutoutAMBGVal">10</span></label>
+                        <label>鑳屾櫙闃堝€? <span id="traceCutoutAMBGVal">10</span></label>
                         <input type="range" id="traceCutoutAMBG" min="0" max="245" value="10" />
                       </div>
                       <div class="param-row">
-                        <label>腐蚀大小: <span id="traceCutoutAMErodeVal">10</span></label>
+                        <label>鑵愯殌澶у皬: <span id="traceCutoutAMErodeVal">10</span></label>
                         <input type="range" id="traceCutoutAMErode" min="1" max="20" value="10" />
                       </div>
                     </div>
                     <div class="param-row param-row-checkbox">
                       <label class="checkbox-row">
                         <input type="checkbox" id="traceCutoutDecontaminate" />
-                        <span>清除边缘色晕</span>
+                        <span>娓呴櫎杈圭紭鑹叉檿</span>
                       </label>
                     </div>
                     <div class="param-row param-row-checkbox">
                       <label class="checkbox-row">
                         <input type="checkbox" id="traceCutoutPostProcess" />
-                        <span>二值掩码去噪</span>
+                        <span>浜屽€兼帺鐮佸幓鍣?/span>
                       </label>
                     </div>
                   </div>
                 </div>
                 <button class="btn btn-primary" id="traceBtn" disabled>
-                  <span class="btn-text">开始描图</span>
-                  <span class="btn-loader hidden">处理中...</span>
+                  <span class="btn-text">寮€濮嬫弿鍥?/span>
+                  <span class="btn-loader hidden">澶勭悊涓?..</span>
                 </button>
               </div>
               <div class="trace-output">
                 
                 <div class="svg-preview" id="svgPreview">
-                  <div class="svg-placeholder">等待生成...</div>
+                  <div class="svg-placeholder">绛夊緟鐢熸垚...</div>
                 </div>
                 <div class="svg-info hidden" id="svgInfo">
                   <span class="svg-size"></span>
-                  <button class="btn btn-small" id="downloadSvg">下载 SVG</button>
-                  <button class="btn btn-small" id="exportPdfBtn">导出印刷 PDF</button>
-                  <button class="btn btn-small btn-accent" id="colorMatchBtn">提取主色 & Pantone 匹配</button>
+                  <button class="btn btn-small" id="downloadSvg">涓嬭浇 SVG</button>
+                  <button class="btn btn-small" id="exportPdfBtn">瀵煎嚭鍗板埛 PDF</button>
+                  <button class="btn btn-small btn-accent" id="colorMatchBtn">鎻愬彇涓昏壊 & Pantone 鍖归厤</button>
                 </div>
                 <div class="export-panel hidden" id="exportPanel">
                   <div class="export-form">
-                    <label>成品宽 (mm)</label>
+                    <label>鎴愬搧瀹?(mm)</label>
                     <input type="number" id="expWidth" value="210" min="1" />
-                    <label>成品高 (mm)</label>
+                    <label>鎴愬搧楂?(mm)</label>
                     <input type="number" id="expHeight" value="297" min="1" />
-                    <label>出血 (mm)</label>
+                    <label>鍑鸿 (mm)</label>
                     <input type="number" id="expBleed" value="3" min="0" step="0.5" />
-                    <button class="btn btn-primary" id="exportPdfConfirm">生成印刷 PDF</button>
-                    <button class="btn btn-small" id="exportPdfCancel">取消</button>
+                    <button class="btn btn-primary" id="exportPdfConfirm">鐢熸垚鍗板埛 PDF</button>
+                    <button class="btn btn-small" id="exportPdfCancel">鍙栨秷</button>
                   </div>
-                  <div class="export-hint">输出 A4 留边 CMYK PDF（含出血与裁切线）</div>
+                  <div class="export-hint">杈撳嚭 A4 鐣欒竟 CMYK PDF锛堝惈鍑鸿涓庤鍒囩嚎锛?/div>
                 </div>
                 <div class="palette-results hidden" id="paletteResults"></div>
               </div>
@@ -528,12 +526,12 @@
         <section class="tab-content" id="tab-pantone">
           <div class="card">
             <div class="card-header">
-              <h2>Pantone 色号查询</h2>
-              <p class="card-desc">输入 Pantone 色号，获取 CMYK / HEX / RGB 值</p>
+              <h2>Pantone 鑹插彿鏌ヨ</h2>
+              <p class="card-desc">杈撳叆 Pantone 鑹插彿锛岃幏鍙?CMYK / HEX / RGB 鍊?/p>
             </div>
             <div class="search-row">
-              <input type="text" id="pantoneInput" class="search-input" placeholder="输入色号，如: 485C / 180 C / Warm Red" />
-              <button class="btn btn-primary" id="pantoneBtn">查询</button>
+              <input type="text" id="pantoneInput" class="search-input" placeholder="杈撳叆鑹插彿锛屽: 485C / 180 C / Warm Red" />
+              <button class="btn btn-primary" id="pantoneBtn">鏌ヨ</button>
             </div>
             <div class="result-card hidden" id="pantoneResult">
               <div class="color-swatch" id="pantoneSwatch"></div>
@@ -556,7 +554,7 @@
               </div>
             </div>
             <div class="export-row hidden" id="pantoneExportRow">
-              <button class="btn btn-small btn-secondary" id="pantoneExportBtn">导出色卡 PDF</button>
+              <button class="btn btn-small btn-secondary" id="pantoneExportBtn">瀵煎嚭鑹插崱 PDF</button>
             </div>
             <div class="error-msg hidden" id="pantoneError"></div>
           </div>
@@ -566,31 +564,31 @@
         <section class="tab-content" id="tab-match">
           <div class="card">
             <div class="card-header">
-              <h2>HEX → Pantone 最近色匹配</h2>
-              <p class="card-desc">输入 HEX 颜色值，查找最近的 5 个 Pantone 色</p>
+              <h2>HEX 鈫?Pantone 鏈€杩戣壊鍖归厤</h2>
+              <p class="card-desc">杈撳叆 HEX 棰滆壊鍊硷紝鏌ユ壘鏈€杩戠殑 5 涓?Pantone 鑹?/p>
             </div>
             <div class="search-row">
               <div class="color-input-wrap">
                 <input type="color" id="colorPicker" value="#DA291C" class="color-picker-input" />
                 <input type="text" id="hexInput" class="search-input" value="#DA291C" placeholder="#DA291C" maxlength="7" />
               </div>
-              <button class="btn btn-primary" id="matchBtn">匹配</button>
+              <button class="btn btn-primary" id="matchBtn">鍖归厤</button>
             </div>
             <div class="match-results" id="matchResults">
-              <div class="match-placeholder">输入 HEX 颜色进行匹配...</div>
+              <div class="match-placeholder">杈撳叆 HEX 棰滆壊杩涜鍖归厤...</div>
             </div>
             <div class="export-row hidden" id="matchExportRow">
-              <button class="btn btn-small btn-secondary" id="matchExportBtn">导出匹配报告 PDF</button>
+              <button class="btn btn-small btn-secondary" id="matchExportBtn">瀵煎嚭鍖归厤鎶ュ憡 PDF</button>
             </div>
           </div>
         </section>
 
-        <!-- Tab: 3D 灰度图 -->
+        <!-- Tab: 3D 鐏板害鍥?-->
         <section class="tab-content" id="tab-greyscale3d">
           <div class="card">
             <div class="card-header">
-              <h2>3D 灰度图</h2>
-              <p class="card-desc">将彩色图片转为灰度高度图 / 位移贴图，用于 3D 建模（Blender / 3D 打印 / 深度通道）</p>
+              <h2>3D 鐏板害鍥?/h2>
+              <p class="card-desc">灏嗗僵鑹插浘鐗囪浆涓虹伆搴﹂珮搴﹀浘 / 浣嶇Щ璐村浘锛岀敤浜?3D 寤烘ā锛圔lender / 3D 鎵撳嵃 / 娣卞害閫氶亾锛?/p>
             </div>
             <div class="trace-layout">
               <div class="trace-input">
@@ -598,21 +596,21 @@
                   <input type="file" id="g3dFile" accept="image/*" hidden />
                   <div class="upload-placeholder">
                     <svg class="upload-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="56" height="56" aria-hidden="true"><path fill="currentColor" d="M853.344 341.344C853.344 294.4 814.944 256 768 256s-85.344 38.4-85.344 85.344 38.4 85.344 85.344 85.344 85.344-38.4 85.344-85.344z"/><path fill="currentColor" d="M0 85.344v853.344h512v-85.344H85.344V742.4l256-256L512 657.056l59.744-59.744-230.4-230.4-256 256V170.656h853.344v298.656l85.344 85.344V85.312z"/><path fill="currentColor" d="M951.456 840.544L1011.2 780.8l-200.544-200.544-200.544 200.544 59.744 59.744L768 742.4v238.944h85.344V742.4z"/></svg>
-                    <div class="upload-text">点击上传或拖拽图片</div>
-                    <div class="upload-hint">PNG / JPG / WebP · 最大 10MB</div>
+                    <div class="upload-text">鐐瑰嚮涓婁紶鎴栨嫋鎷藉浘鐗?/div>
+                    <div class="upload-hint">PNG / JPG / WebP 路 鏈€澶?10MB</div>
                   </div>
                   <img id="g3dPreviewImg" class="preview-img hidden" />
                 </div>
                 <div class="params">
                   <div class="param-row">
-                    <label>位深</label>
+                    <label>浣嶆繁</label>
                     <select id="g3dBitDepth">
-                      <option value="8">8-bit（通用）</option>
-                      <option value="16">16-bit（高精度）</option>
+                      <option value="8">8-bit锛堥€氱敤锛?/option>
+                      <option value="16">16-bit锛堥珮绮惧害锛?/option>
                     </select>
                   </div>
                   <div class="param-row">
-                    <label>对比度: <span id="g3dContrastVal">1.0</span></label>
+                    <label>瀵规瘮搴? <span id="g3dContrastVal">1.0</span></label>
                     <input type="range" id="g3dContrast" min="0.5" max="3" step="0.1" value="1.0" />
                   </div>
                   <div class="param-row">
@@ -620,45 +618,45 @@
                     <input type="range" id="g3dGamma" min="0.5" max="2" step="0.1" value="1.0" />
                   </div>
                   <div class="param-row">
-                    <label>平滑: <span id="g3dSmoothVal">0</span></label>
+                    <label>骞虫粦: <span id="g3dSmoothVal">0</span></label>
                     <input type="range" id="g3dSmooth" min="0" max="5" step="0.5" value="0" />
                   </div>
                   <div class="param-row param-row-checkbox">
                     <label class="checkbox-row">
                       <input type="checkbox" id="g3dInvert" />
-                      <span>反色（黑=低 白=高）</span>
+                      <span>鍙嶈壊锛堥粦=浣?鐧?楂橈級</span>
                     </label>
                   </div>
                   <div class="param-row param-row-checkbox">
                     <label class="checkbox-row">
                       <input type="checkbox" id="g3dAutoLevels" />
-                      <span>自动级别（归一化亮度）</span>
+                      <span>鑷姩绾у埆锛堝綊涓€鍖栦寒搴︼級</span>
                     </label>
                   </div>
                 </div>
                 <button class="btn btn-primary" id="g3dBtn" disabled>
-                  <span class="btn-text">生成灰度图</span>
-                  <span class="btn-loader hidden">处理中...</span>
+                  <span class="btn-text">鐢熸垚鐏板害鍥?/span>
+                  <span class="btn-loader hidden">澶勭悊涓?..</span>
                 </button>
               </div>
               <div class="trace-output">
                 <div class="svg-preview" id="g3dPreview">
-                  <div class="svg-placeholder">等待生成...</div>
+                  <div class="svg-placeholder">绛夊緟鐢熸垚...</div>
                 </div>
                 <div class="svg-info hidden" id="g3dInfo">
                   <span class="svg-size" id="g3dSize"></span>
-                  <button class="btn btn-small" id="g3dDownload">下载灰度 PNG</button>
+                  <button class="btn btn-small" id="g3dDownload">涓嬭浇鐏板害 PNG</button>
                 </div>
                 <div class="g3d-histogram hidden" id="g3dHist">
                   <div class="hist-header">
-                    <span class="hist-title">亮度直方图</span>
+                    <span class="hist-title">浜害鐩存柟鍥?/span>
                     <span class="hist-meta" id="g3dHistMeta"></span>
                   </div>
                   <div class="hist-bar" id="g3dHistBar"></div>
                   <div class="hist-axis">
-                    <span>0 (黑)</span>
-                    <span>128 (灰)</span>
-                    <span>255 (白)</span>
+                    <span>0 (榛?</span>
+                    <span>128 (鐏?</span>
+                    <span>255 (鐧?</span>
                   </div>
                 </div>
               </div>
@@ -666,66 +664,66 @@
           </div>
         </section>
 
-        <!-- Tab: AI 生图（GEN 适配器层） -->
+        <!-- Tab: AI 鐢熷浘锛圙EN 閫傞厤鍣ㄥ眰锛?-->
         <section class="tab-content" id="tab-generate">
           <div class="card">
             <div class="card-header">
-              <h2>AI 生图</h2>
-              <p class="card-desc">输入一句话生成包装效果图，零本地 GPU，直接送下游印刷链路</p>
+              <h2>AI 鐢熷浘</h2>
+              <p class="card-desc">杈撳叆涓€鍙ヨ瘽鐢熸垚鍖呰鏁堟灉鍥撅紝闆舵湰鍦?GPU锛岀洿鎺ラ€佷笅娓稿嵃鍒烽摼璺?/p>
             </div>
             <div class="gen-layout">
               <div class="gen-input">
-                <!-- 模式切换 -->
+                <!-- 妯″紡鍒囨崲 -->
                 <div class="gen-mode-toggle">
-                  <label class="gen-mode-label">模式</label>
+                  <label class="gen-mode-label">妯″紡</label>
                   <div class="gen-mode-btns">
-                    <button type="button" class="gen-mode-btn active" data-mode="single">单张</button>
-                    <button type="button" class="gen-mode-btn" data-mode="batch">批量</button>
+                    <button type="button" class="gen-mode-btn active" data-mode="single">鍗曞紶</button>
+                    <button type="button" class="gen-mode-btn" data-mode="batch">鎵归噺</button>
                   </div>
                 </div>
                 <div class="param-row">
-                  <label id="genPromptLabel">生图描述</label>
+                  <label id="genPromptLabel">鐢熷浘鎻忚堪</label>
                   <div class="gen-prompt-area">
-                    <textarea id="genPrompt" class="gen-prompt-input" rows="3" placeholder="红色天地盖礼盒，烫金logo，哑光材质，电商白底"></textarea>
-                    <button type="button" class="btn btn-small btn-secondary gen-optimize-btn" id="genOptimizeBtn">✨ 优化</button>
+                    <textarea id="genPrompt" class="gen-prompt-input" rows="3" placeholder="绾㈣壊澶╁湴鐩栫ぜ鐩掞紝鐑噾logo锛屽搼鍏夋潗璐紝鐢靛晢鐧藉簳"></textarea>
+                    <button type="button" class="btn btn-small btn-secondary gen-optimize-btn" id="genOptimizeBtn">鉁?浼樺寲</button>
                   </div>
                   <p class="gen-hint" id="genPromptHint"></p>
                 </div>
                 <div class="gen-template-section">
                   <div class="gen-template-header">
-                    <label>🎨 行业模板</label>
+                    <label>馃帹 琛屼笟妯℃澘</label>
                     <div class="gen-tpl-actions">
-                      <button type="button" class="btn btn-small btn-secondary" id="genTplToggle">展开</button>
-                      <button type="button" class="btn btn-small btn-secondary" id="genTplCustomBtn" title="创建自定义模板">+ 自定义</button>
-                      <button type="button" class="btn btn-small btn-secondary" id="genTplExportBtn" title="导出自定义模板">导出</button>
-                      <button type="button" class="btn btn-small btn-secondary" id="genTplImportBtn" title="导入模板">导入</button>
+                      <button type="button" class="btn btn-small btn-secondary" id="genTplToggle">灞曞紑</button>
+                      <button type="button" class="btn btn-small btn-secondary" id="genTplCustomBtn" title="鍒涘缓鑷畾涔夋ā鏉?>+ 鑷畾涔?/button>
+                      <button type="button" class="btn btn-small btn-secondary" id="genTplExportBtn" title="瀵煎嚭鑷畾涔夋ā鏉?>瀵煎嚭</button>
+                      <button type="button" class="btn btn-small btn-secondary" id="genTplImportBtn" title="瀵煎叆妯℃澘">瀵煎叆</button>
                       <input type="file" id="genTplImportFile" accept=".json" hidden />
                     </div>
                   </div>
                   <div class="gen-template-body hidden" id="genTplBody">
                     <div class="param-row">
-                      <label>模板</label>
+                      <label>妯℃澘</label>
                       <select id="genTplSelect">
-                        <option value="">— 选择模板 —</option>
+                        <option value="">鈥?閫夋嫨妯℃澘 鈥?/option>
                       </select>
                     </div>
                     <div id="genTplParams"></div>
-                    <button type="button" class="btn btn-small" id="genTplApply" disabled>应用模板 → prompt</button>
+                    <button type="button" class="btn btn-small" id="genTplApply" disabled>搴旂敤妯℃澘 鈫?prompt</button>
                     <p class="gen-hint" id="genTplHint"></p>
                   </div>
                 </div>
                 <div class="gen-opts">
                   <div class="param-row">
-                    <label>后端</label>
+                    <label>鍚庣</label>
                     <select id="genBackend">
-                      <option value="auto">自动（按优先级降级）</option>
-                      <option value="volcano">火山方舟 · 即梦</option>
+                      <option value="auto">鑷姩锛堟寜浼樺厛绾ч檷绾э級</option>
+                      <option value="volcano">鐏北鏂硅垷 路 鍗虫ⅵ</option>
                       <option value="fal">fal.ai</option>
-                      <option value="comfyui">本地 ComfyUI</option>
+                      <option value="comfyui">鏈湴 ComfyUI</option>
                     </select>
                   </div>
                   <div class="param-row">
-                    <label>张数</label>
+                    <label>寮犳暟</label>
                     <select id="genN">
                       <option value="1">1</option>
                       <option value="2">2</option>
@@ -734,64 +732,64 @@
                     </select>
                   </div>
                   <div class="param-row">
-                    <label>尺寸</label>
+                    <label>灏哄</label>
                     <select id="genSize">
-                      <option value="1024x1024">1024×1024</option>
-                      <option value="1024x1536">1024×1536</option>
-                      <option value="1536x1024">1536×1024</option>
+                      <option value="1024x1024">1024脳1024</option>
+                      <option value="1024x1536">1024脳1536</option>
+                      <option value="1536x1024">1536脳1024</option>
                     </select>
                   </div>
                 </div>
                 <div class="param-row">
-                  <label>参考图（可选 · 图生图）</label>
+                  <label>鍙傝€冨浘锛堝彲閫?路 鍥剧敓鍥撅級</label>
                   <div class="upload-zone gen-ref-zone" id="genRefZone">
                     <input type="file" id="genRefFile" accept="image/*" hidden />
                     <div class="upload-placeholder">
                       <svg class="upload-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="40" height="40" aria-hidden="true"><path fill="currentColor" d="M853.344 341.344C853.344 294.4 814.944 256 768 256s-85.344 38.4-85.344 85.344 38.4 85.344 85.344 85.344 85.344-38.4 85.344-85.344z"/><path fill="currentColor" d="M0 85.344v853.344h512v-85.344H85.344V742.4l256-256L512 657.056l59.744-59.744-230.4-230.4-256 256V170.656h853.344v298.656l85.344 85.344V85.312z"/></svg>
-                      <div class="upload-text">点击上传或拖拽参考图</div>
-                      <div class="upload-hint">PNG / JPG / WebP · 最大 10MB</div>
+                      <div class="upload-text">鐐瑰嚮涓婁紶鎴栨嫋鎷藉弬鑰冨浘</div>
+                      <div class="upload-hint">PNG / JPG / WebP 路 鏈€澶?10MB</div>
                     </div>
                     <img id="genRefPreviewImg" class="preview-img hidden" />
                   </div>
                 </div>
                 <div class="param-row gen-reverse-block">
-                  <label>反向闭环（可选 · 图→prompt）</label>
+                  <label>鍙嶅悜闂幆锛堝彲閫?路 鍥锯啋prompt锛?/label>
                   <div class="upload-zone gen-reverse-zone" id="genReverseZone">
                     <input type="file" id="genReverseFile" accept="image/*" hidden />
                     <div class="upload-placeholder">
                       <svg class="upload-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="40" height="40" aria-hidden="true"><path fill="currentColor" d="M832 288c0-47-38.4-85.344-85.344-85.344s-85.344 38.4-85.344 85.344 38.4 85.344 85.344 85.344 85.344-38.4 85.344-85.344zM512 384c-100.416 0-181.344 73.472-181.344 172.672 0 65.376 36.224 120.032 92.992 152.512v49.536c0 23.488 18.944 42.496 42.352 42.496s42.352-19.008 42.352-42.496v-49.536c56.768-32.48 92.992-87.136 92.992-152.512C693.344 457.472 612.416 384 512 384zm0 256c-47.008 0-85.344-38.336-85.344-85.344S464.992 470.4 512 470.4s85.344 38.336 85.344 85.344S559.008 640 512 640z"/><path fill="currentColor" d="M512 0C229.248 0 0 181.248 0 405.344 0 603.648 268.288 1024 512 1024s512-420.352 512-618.656C1024 181.248 794.752 0 512 0zm0 903.488C260.032 903.488 85.344 574.976 85.344 405.344 85.344 224.448 282.368 85.344 512 85.344s426.656 139.104 426.656 320c0 169.632-174.688 498.144-426.656 498.144z"/></svg>
-                      <div class="upload-text">上传参考图 → 自动提取 prompt</div>
-                      <div class="upload-hint">图→prompt→生图 反向闭环</div>
+                      <div class="upload-text">涓婁紶鍙傝€冨浘 鈫?鑷姩鎻愬彇 prompt</div>
+                      <div class="upload-hint">鍥锯啋prompt鈫掔敓鍥?鍙嶅悜闂幆</div>
                     </div>
                     <img id="genReversePreviewImg" class="preview-img hidden" />
                   </div>
                   <button class="btn btn-secondary btn-small" id="genReverseBtn" disabled>
-                    <span class="btn-text">🔍 提取 prompt</span>
-                    <span class="btn-loader hidden">提取中...</span>
+                    <span class="btn-text">馃攳 鎻愬彇 prompt</span>
+                    <span class="btn-loader hidden">鎻愬彇涓?..</span>
                   </button>
                   <button class="btn btn-secondary btn-small" id="genSaveRefBtn" disabled>
-                    <span class="btn-text">💾 保存到图库</span>
+                    <span class="btn-text">馃捑 淇濆瓨鍒板浘搴?/span>
                   </button>
                 </div>
-                <!-- 参考图库 -->
+                <!-- 鍙傝€冨浘搴?-->
                 <div class="gen-ref-gallery" id="genRefGallery">
                   <div class="gen-ref-gallery-header">
-                    <label>📷 参考图库</label>
-                    <button type="button" class="btn btn-small btn-secondary" id="genRefGalleryClear">清空</button>
+                    <label>馃摲 鍙傝€冨浘搴?/label>
+                    <button type="button" class="btn btn-small btn-secondary" id="genRefGalleryClear">娓呯┖</button>
                   </div>
                   <div class="gen-ref-gallery-items" id="genRefGalleryItems">
-                    <div class="key-empty" id="genRefGalleryEmpty">暂无保存的参考图</div>
+                    <div class="key-empty" id="genRefGalleryEmpty">鏆傛棤淇濆瓨鐨勫弬鑰冨浘</div>
                   </div>
                 </div>
                 <button class="btn btn-primary" id="genBtn" disabled>
-                  <span class="btn-text">✨ 生成效果图</span>
-                  <span class="btn-loader hidden">生成中...</span>
+                  <span class="btn-text">鉁?鐢熸垚鏁堟灉鍥?/span>
+                  <span class="btn-loader hidden">鐢熸垚涓?..</span>
                 </button>
-                <p class="gen-hint" id="genHint">生成图为灵感稿，印刷请走右侧生产链路</p>
+                <p class="gen-hint" id="genHint">鐢熸垚鍥句负鐏垫劅绋匡紝鍗板埛璇疯蛋鍙充晶鐢熶骇閾捐矾</p>
               </div>
               <div class="gen-output">
                 <div class="gen-results" id="genResults">
-                  <div class="svg-placeholder">等待生成...</div>
+                  <div class="svg-placeholder">绛夊緟鐢熸垚...</div>
                 </div>
               </div>
             </div>

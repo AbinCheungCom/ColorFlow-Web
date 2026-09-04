@@ -1781,6 +1781,73 @@ def set_llm_config():
     })
 
 
+# ============================================================
+# LLM Key Store API — 通过设置页管理大模型 API Key（持久化）
+# ============================================================
+
+@app.route("/api/llm-keys", methods=["GET"])
+def llm_keys_list():
+    """列出所有 LLM provider 的 key 状态（脱敏）。"""
+    from llm_keys import llm_keystore
+    providers = llm_keystore.list_all()
+    return jsonify({
+        "success": True,
+        "providers": providers,
+    })
+
+
+@app.route("/api/llm-keys", methods=["POST"])
+def llm_keys_set():
+    """设置某 provider 的 API key。
+
+    JSON body:
+        provider: str  — provider ID (openai/claude/volcano/fal/comfyui)
+        key: str       — API key value (空串表示清除)
+        config: dict   — 可选额外配置 {base_url, model}
+    """
+    from llm_keys import llm_keystore, PROVIDERS
+    data = request.get_json(silent=True) or {}
+    provider = (data.get("provider") or "").strip().lower()
+    key = (data.get("key") or "").strip()
+    config = data.get("config") or {}
+
+    if provider not in PROVIDERS:
+        return jsonify({"error": f"未知 provider: {provider}", "valid": list(PROVIDERS.keys())}), 400
+
+    if not key:
+        # 空串 = 清除
+        llm_keystore.remove(provider)
+        return jsonify({"success": True, "action": "removed", "provider": provider})
+
+    try:
+        result = llm_keystore.set_key(provider, key)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    # 同步 base_url 到环境变量（运行时可见）
+    if config.get("base_url"):
+        env_key = PROVIDERS[provider].get("env_base", "")
+        if env_key:
+            os.environ[env_key] = config["base_url"]
+
+    return jsonify({
+        "success": True,
+        "action": "set",
+        "provider": provider,
+        "key_preview": result.get("key", "")[:8] + "…",
+    })
+
+
+@app.route("/api/llm-keys/<provider>", methods=["DELETE"])
+def llm_keys_remove(provider):
+    """删除某 provider 的 key。"""
+    from llm_keys import llm_keystore, PROVIDERS
+    if provider not in PROVIDERS:
+        return jsonify({"error": f"未知 provider: {provider}"}), 400
+    llm_keystore.remove(provider)
+    return jsonify({"success": True, "action": "removed", "provider": provider})
+
+
 if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
