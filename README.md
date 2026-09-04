@@ -246,7 +246,7 @@ curl -X POST http://localhost:5000/api/restart
 }
 ```
 
-### 可用工具（16 个）
+### 可用工具（17 个）
 
 | Tool | 说明 | 关键参数 |
 |------|------|---------|
@@ -266,6 +266,7 @@ curl -X POST http://localhost:5000/api/restart
 | `full_pipeline` | 一句话：生图→抠图→描图→Pantone→报价→ZIP | prompt **或** image_path（图→prompt 自动推导）, width_mm, height_mm, qty, colors, backend, vision_backend |
 | `prompt_templates` | 列出行业预制 prompt 模板（按分类分组）| category, search |
 | `prompt_render` | 渲染模板 → 完整英文 prompt | template_id, params（JSON 字符串）|
+| `prompt_optimize` | 优化用户 prompt → 增强版英文 prompt | prompt, backend（auto/openai/mock）|
 
 ### Agent 调用示例
 
@@ -442,8 +443,9 @@ colorflow-web/
 ├── gen_backends.py      # GEN 生图适配器层（volcano / fal / comfyui + auto 降级 + GenResult/GenError）
 ├── vision_backends.py   # VISION 图→prompt 适配器层（openai / claude / mock + auto 降级 + PromptResult/PromptError）
 ├── prompt_templates.py  # Prompt 模板库加载器（assets/prompt_templates.json → render）
+├── prompt_optimizer.py  # Prompt 优化器（OpenAI Chat API，mock 降级）
 ├── colorflow_keys.py    # KeyStore：API Key 生成 / 校验 / 撤销
-├── mcp_server.py        # MCP Server（16 工具 + Key 认证）
+├── mcp_server.py        # MCP Server（17 工具 + Key 认证）
 ├── colorflow_desktop_app.py   # 桌面入口（PyWebview 原生窗口 + Flask 线程）
 ├── colorflow_desktop_app.spec # PyInstaller 打包配置
 ├── restart.ps1          # 服务重启脚本（杀旧进程 + 拉起新实例）

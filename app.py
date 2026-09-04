@@ -1299,6 +1299,160 @@ def gen_jobs_get(job_id):
 
 
 # ============================================================
+# 批量生图（Phase 5 · S4-C）
+# ============================================================
+#
+# 多 prompt 批量提交：每个 prompt 独立调用 gen_dispatch，结果合并。
+# 复用 _gen_jobs 的进程内 dict + 锁模式，batch_id 为 uuid4。
+# 每个 prompt 失败不阻断后续（记录 errors，继续下一个）。
+
+_GEN_BATCH_JOBS = {}
+_BATCH_JOB_TTL = 3600  # 批量任务保留 1 小时
+
+
+def _prune_batch_jobs_locked():
+    """清理过期批量任务（调用方需持 _JOBS_LOCK）"""
+    now = time.time()
+    dead = [bid for bid, job in _GEN_BATCH_JOBS.items()
+            if now - job["created_at"] > _BATCH_JOB_TTL]
+    for bid in dead:
+        _GEN_BATCH_JOBS.pop(bid, None)
+
+
+def _gen_batch_worker(batch_id, prompts, backend, size, n, model, ref_image):
+    """后台线程：逐个 prompt 调 gen_dispatch，结果合并。"""
+    with _JOBS_LOCK:
+        job = _GEN_BATCH_JOBS.get(batch_id)
+        if not job:
+            return
+        job["status"] = "running"
+        job["progress"] = f"批量处理中（0/{len(prompts)}）…"
+
+    all_images = []
+    errors = []
+    t0 = time.time()
+
+    for i, prompt in enumerate(prompts):
+        label = f"批量处理中（{i+1}/{len(prompts)}）… {prompt[:40]}"
+        with _JOBS_LOCK:
+            job = _GEN_BATCH_JOBS.get(batch_id)
+            if job:
+                job["progress"] = label
+        try:
+            results = gen_dispatch(
+                prompt, ref_image=ref_image,
+                backend=backend, size=size, n=n, model=model,
+            )
+            images = _gen_results_to_images(results)
+            for img in images:
+                img["prompt"] = prompt
+                img["batch_index"] = i
+            all_images.extend(images)
+        except GenGenError as e:
+            errors.append({"index": i, "prompt": prompt,
+                           "error": str(e), "code": e.code,
+                           "retryable": e.retryable})
+        except Exception as e:
+            errors.append({"index": i, "prompt": prompt,
+                           "error": str(e), "code": "upstream",
+                           "retryable": True})
+
+    with _JOBS_LOCK:
+        job = _GEN_BATCH_JOBS.get(batch_id)
+        if job:
+            job["status"] = "done"
+            job["progress"] = "完成"
+            job["images"] = all_images
+            job["count"] = len(all_images)
+            job["errors"] = errors
+            job["prompt_count"] = len(prompts)
+            job["elapsed_ms"] = int((time.time() - t0) * 1000)
+            job["finished_at"] = time.time()
+
+
+@app.route("/api/generate/batch", methods=["POST"])
+def gen_batch_create():
+    """提交批量生图任务。
+
+    Form 参数（JSON body 或 multipart）：
+        prompts: prompt 列表（JSON array）或换行分隔字符串
+        backend, size, n, model: 同 /api/generate
+        ref_image: 可选参考图（所有 prompt 共用）
+    """
+    if request.is_json:
+        data = request.json or {}
+        prompts_raw = data.get("prompts", [])
+        if isinstance(prompts_raw, str):
+            prompts = [p.strip() for p in prompts_raw.split("\n") if p.strip()]
+        elif isinstance(prompts_raw, list):
+            prompts = [p.strip() for p in prompts_raw if p.strip()]
+        else:
+            prompts = []
+        backend = (data.get("backend", "auto") or "auto").strip()
+        size = (data.get("size", "1024x1024") or "1024x1024").strip()
+        try:
+            n = max(1, min(int(data.get("n", "1") or "1"), 4))
+        except (TypeError, ValueError):
+            n = 1
+        model = (data.get("model", "") or "").strip()
+        ref_image = data.get("ref_image")  # base64 or None
+    else:
+        prompts_raw = request.form.get("prompts", "")
+        prompts = [p.strip() for p in prompts_raw.split("\n") if p.strip()]
+        backend = (request.form.get("backend", "auto") or "auto").strip()
+        size = (request.form.get("size", "1024x1024") or "1024x1024").strip()
+        try:
+            n = max(1, min(int(request.form.get("n", "1") or "1"), 4))
+        except (TypeError, ValueError):
+            n = 1
+        model = (request.form.get("model", "") or "").strip()
+        ref_image = None
+        if "ref_image" in request.files and request.files["ref_image"].filename:
+            rf = request.files["ref_image"]
+            if rf.content_type not in ALLOWED_CONTENT_TYPES:
+                return jsonify({"error": f"参考图类型不支持: {rf.content_type}"}), 415
+            ref_image = rf.read()
+
+    if not prompts:
+        return jsonify({"error": "prompts 不能为空"}), 400
+    if len(prompts) > 20:
+        return jsonify({"error": "单次最多 20 个 prompt"}), 400
+
+    batch_id = uuid.uuid4().hex
+    now = time.time()
+    with _JOBS_LOCK:
+        _prune_batch_jobs_locked()
+        _GEN_BATCH_JOBS[batch_id] = {
+            "batch_id": batch_id,
+            "status": "queued",
+            "progress": "排队中…",
+            "prompts": prompts,
+            "prompt_count": len(prompts),
+            "created_at": now,
+        }
+
+    threading.Thread(
+        target=_gen_batch_worker,
+        args=(batch_id, prompts, backend, size, n, model, ref_image),
+        daemon=True,
+    ).start()
+    return jsonify({"success": True, "batch_id": batch_id,
+                    "status": "queued", "prompt_count": len(prompts)})
+
+
+@app.route("/api/generate/batch/<batch_id>", methods=["GET"])
+def gen_batch_get(batch_id):
+    """查询批量生图任务状态。"""
+    with _JOBS_LOCK:
+        _prune_batch_jobs_locked()
+        job = _GEN_BATCH_JOBS.get(batch_id)
+        if not job:
+            return jsonify({"error": "任务不存在或已过期", "status": "not_found"}), 404
+        snap = {k: v for k, v in job.items()}
+    return jsonify(snap)
+
+
+# ============================================================
 # VISION 图→prompt（Phase 3 · image2prompt 反向闭环）
 # ============================================================
 #
@@ -1389,6 +1543,52 @@ def generate_prompt_api():
     except Exception as e:
         logger.exception("generate_prompt_api 图→prompt 失败")
         return jsonify({"error": f"图→prompt 失败: {e}"}), 500
+
+
+# ============================================================
+# Prompt 优化器（Phase 5 · S4-C）
+# ============================================================
+#
+# 用户 prompt → 增强版 prompt（调 OpenAI Chat Completions，text→text）。
+# 无 Key 时降级 mock（纯字符串拼接，不调 API）。
+# 逻辑在 prompt_optimizer.py，与 vision_backends.py 同风格。
+
+@app.route("/api/prompt/optimize", methods=["POST"])
+def prompt_optimize_api():
+    """优化用户 prompt → 增强版英文 prompt。
+
+    JSON body:
+        prompt:  用户原始 prompt（必填）
+        backend: auto / openai / mock（默认 auto）
+        model:   覆盖模型名（可选）
+    """
+    from prompt_optimizer import dispatch_optimize, OptimizeError
+    data = request.get_json(silent=True) or {}
+    prompt = (data.get("prompt", "") or "").strip()
+    if not prompt:
+        return jsonify({"error": "prompt 不能为空"}), 400
+    backend = (data.get("backend", "auto") or "auto").strip()
+    model = (data.get("model", "") or "").strip()
+    try:
+        t0 = time.time()
+        result = dispatch_optimize(prompt, backend=backend, model=model, timeout=60)
+        return jsonify({
+            "success": True,
+            "prompt": result.prompt,
+            "backend": result.backend,
+            "model": result.model,
+            "elapsed_ms": int((time.time() - t0) * 1000),
+            "meta": result.meta,
+        })
+    except OptimizeError as e:
+        code_map = {"auth": (401, "未配置 API Key"), "quota": (402, "额度不足"),
+                    "timeout": (504, "请求超时"), "upstream": (500, "上游失败")}
+        status, label = code_map.get(e.code, (500, "优化失败"))
+        return jsonify({"error": f"{label}: {e}", "code": e.code,
+                        "retryable": e.retryable}), status
+    except Exception as e:
+        logger.exception("prompt_optimize_api 失败")
+        return jsonify({"error": f"优化失败: {e}"}), 500
 
 
 # ============================================================

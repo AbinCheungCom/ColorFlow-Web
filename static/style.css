@@ -1286,6 +1286,100 @@ body {
   min-height: 88px;
 }
 
+/* 参考图库 */
+.gen-ref-gallery {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+  padding: 12px;
+}
+.gen-ref-gallery-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.gen-ref-gallery-header label {
+  font-size: 13px;
+  font-weight: 540;
+}
+.gen-ref-gallery-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.gen-ref-gallery-item {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.gen-ref-gallery-item:hover {
+  border-color: var(--primary);
+  transform: scale(1.05);
+}
+.gen-ref-gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gen-ref-gallery-item .gen-ref-del {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  border: none;
+  font-size: 11px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.gen-ref-gallery-item:hover .gen-ref-del { display: flex; }
+
+/* 批量生图结果 */
+.gen-batch-summary {
+  padding: 10px 14px;
+  background: var(--block-mint);
+  color: #156b38;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 480;
+  margin-bottom: 12px;
+}
+.gen-card-prompt {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+  max-height: 32px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.gen-batch-errors {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(214, 69, 69, 0.06);
+  border: 1px solid rgba(214, 69, 69, 0.2);
+  border-radius: var(--radius-md);
+}
+.gen-batch-error-item {
+  font-size: 12px;
+  color: var(--error);
+  line-height: 1.6;
+}
+
 /* 行业 Prompt 模板库 */
 .gen-template-section {
   border: 1px solid var(--hairline);
@@ -1297,10 +1391,72 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .gen-template-header label {
   font-weight: 540;
   font-size: 13px;
+}
+.gen-tpl-actions {
+  display: flex;
+  gap: 4px;
+}
+.gen-tpl-actions .btn {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+/* 模式切换 */
+.gen-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.gen-mode-label {
+  font-size: 13px;
+  font-weight: 540;
+}
+.gen-mode-btns {
+  display: flex;
+  gap: 4px;
+}
+.gen-mode-btn {
+  padding: 5px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 480;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
+}
+.gen-mode-btn:hover { background: rgba(0,0,0,0.04); }
+.gen-mode-btn.active {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
+}
+
+/* Prompt 区域（输入框 + 优化按钮） */
+.gen-prompt-area {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.gen-prompt-area .gen-prompt-input {
+  flex: 1;
+  min-width: 0;
+}
+.gen-optimize-btn {
+  flex-shrink: 0;
+  margin-top: 2px;
+  padding: 6px 12px;
+  font-size: 12px;
+  white-space: nowrap;
 }
 .gen-template-body {
   margin-top: 12px;

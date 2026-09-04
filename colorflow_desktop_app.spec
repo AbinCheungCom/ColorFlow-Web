@@ -33,6 +33,7 @@ hiddenimports = [
     "gen_backends",
     "vision_backends",
     "prompt_templates",
+    "prompt_optimizer",
     "services", "services.color_delta_e", "services.color_pdf",
     "colorflow_keys",
     "colorflow_sdk", "colorflow_sdk.exceptions",

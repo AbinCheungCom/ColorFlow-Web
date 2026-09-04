@@ -1483,22 +1483,37 @@ async function loadGenTemplates() {
     const data = await resp.json();
     if (!data.success) return;
     _genTplData = data.templates || [];
-    // 填充下拉（按 category 分组）
-    const cats = data.categories || [];
-    let html = '<option value="">— 选择模板 —</option>';
-    cats.forEach(cat => {
-      const tpls = _genTplData.filter(t => t.category === cat.id);
-      if (tpls.length === 0) return;
-      html += `<optgroup label="${cat.icon} ${cat.name}">`;
-      tpls.forEach(t => {
-        html += `<option value="${t.id}">${t.name}</option>`;
-      });
-      html += '</optgroup>';
-    });
-    genTplSelect.innerHTML = html;
+    // 合并自定义模板
+    const custom = loadCustomTemplates();
+    if (custom.length > 0) _genTplData = [..._genTplData, ...custom];
+    renderTplSelect(data.categories || []);
   } catch (e) {
     genTplHint.textContent = '模板加载失败：' + fetchErrorMessage(e);
   }
+}
+
+function renderTplSelect(cats) {
+  if (!genTplSelect) return;
+  let html = '<option value="">— 选择模板 —</option>';
+  cats.forEach(cat => {
+    const tpls = _genTplData.filter(t => t.category === cat.id);
+    if (tpls.length === 0) return;
+    html += `<optgroup label="${cat.icon} ${cat.name}">`;
+    tpls.forEach(t => {
+      html += `<option value="${t.id}">${t.name}</option>`;
+    });
+    html += '</optgroup>';
+  });
+  // 自定义模板
+  const custom = _genTplData.filter(t => t.category === 'custom');
+  if (custom.length > 0) {
+    html += '<optgroup label="⭐ 自定义模板">';
+    custom.forEach(t => {
+      html += `<option value="${t.id}">${t.name}</option>`;
+    });
+    html += '</optgroup>';
+  }
+  genTplSelect.innerHTML = html;
 }
 
 if (genTplSelect) {
@@ -1511,13 +1526,18 @@ if (genTplSelect) {
       return;
     }
     // 获取完整模板定义（含 params）
-    apiFetch('/api/prompt-templates/' + encodeURIComponent(sel.id))
-      .then(r => r.json())
-      .then(data => {
-        if (!data.success) return;
-        renderTplParams(data.template);
-      })
-      .catch(e => { genTplHint.textContent = '模板详情加载失败'; });
+    if (sel.id.startsWith('custom_')) {
+      // 自定义模板：直接从 _genTplData 获取
+      renderTplParams(sel);
+    } else {
+      apiFetch('/api/prompt-templates/' + encodeURIComponent(sel.id))
+        .then(r => r.json())
+        .then(data => {
+          if (!data.success) return;
+          renderTplParams(data.template);
+        })
+        .catch(e => { genTplHint.textContent = '模板详情加载失败'; });
+    }
   });
 }
 
@@ -1568,17 +1588,28 @@ if (genTplApply) {
       params[s.dataset.param] = s.value;
     });
     try {
-      const formData = new FormData();
-      formData.append('template_id', genTplSelect.value);
-      Object.entries(params).forEach(([k, v]) => formData.append('param_' + k, v));
-      const resp = await apiFetch('/api/prompt-templates/render', { method: 'POST', body: formData });
-      const data = await resp.json();
-      if (!data.success) { genTplHint.textContent = '渲染失败：' + (data.error || ''); return; }
+      let resultPrompt;
+      if (sel.id.startsWith('custom_')) {
+        // 自定义模板：客户端渲染
+        resultPrompt = sel.prompt || '';
+        genTplParams.querySelectorAll('.tpl-param-select').forEach(s => {
+          resultPrompt = resultPrompt.replace('{' + s.dataset.param + '}', s.value);
+        });
+      } else {
+        // 内置模板：服务端渲染
+        const formData = new FormData();
+        formData.append('template_id', sel.id);
+        Object.entries(params).forEach(([k, v]) => formData.append('param_' + k, v));
+        const resp = await apiFetch('/api/prompt-templates/render', { method: 'POST', body: formData });
+        const data = await resp.json();
+        if (!data.success) { genTplHint.textContent = '渲染失败：' + (data.error || ''); return; }
+        resultPrompt = data.prompt;
+      }
       if (genPrompt) {
-        genPrompt.value = data.prompt;
+        genPrompt.value = resultPrompt;
         genBtn.disabled = false;
       }
-      genHint.textContent = '🎨 prompt 已由模板「' + data.template_name + '」生成，可直接生成或微调后再生成';
+      genHint.textContent = '🎨 prompt 已由模板「' + sel.name + '」生成，可直接生成或微调后再生成';
     } catch (e) {
       genTplHint.textContent = '渲染失败：' + fetchErrorMessage(e);
     }
@@ -1596,3 +1627,364 @@ if (genTplSelect && !genTplSelect.value) {
 setupKeyInput('openaiKeyInput', 'openaiBaseInput', 'openai_key', 'openai_base');
 setupKeyInput('claudeKeyInput', 'claudeBaseInput', 'claude_key', 'claude_base');
 setupMcpApiKey();
+
+// ============================================================
+// S4-C: 批量生图 + Prompt 优化 + 参考图库 + 模板市场
+// ============================================================
+
+// ── 模式切换（单张/批量）──
+let _genMode = 'single';
+const genModeBtns = document.querySelectorAll('.gen-mode-btn');
+const genPromptLabel = document.getElementById('genPromptLabel');
+const genPrompt = document.getElementById('genPrompt');
+genModeBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    genModeBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    _genMode = btn.dataset.mode;
+    if (_genMode === 'batch') {
+      genPromptLabel.textContent = '生图描述（每行一个 prompt，最多 20 个）';
+      genPrompt.placeholder = 'prompt 1\nprompt 2\nprompt 3';
+      genPrompt.rows = 6;
+    } else {
+      genPromptLabel.textContent = '生图描述';
+      genPrompt.placeholder = '红色天地盖礼盒，烫金logo，哑光材质，电商白底';
+      genPrompt.rows = 3;
+    }
+  });
+});
+
+// ── Prompt 优化按钮 ──
+const genOptimizeBtn = document.getElementById('genOptimizeBtn');
+const genPromptHint = document.getElementById('genPromptHint');
+if (genOptimizeBtn) {
+  genOptimizeBtn.addEventListener('click', async () => {
+    const prompt = genPrompt.value.trim();
+    if (!prompt) { genPromptHint.textContent = '请先输入 prompt'; return; }
+    genOptimizeBtn.disabled = true;
+    genPromptHint.textContent = '✨ 优化中…';
+    try {
+      const resp = await apiFetch('/api/prompt/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: prompt, backend: 'auto' }),
+      });
+      const data = await resp.json();
+      if (data.success) {
+        genPrompt.value = data.prompt;
+        genPromptHint.textContent = `✅ 已优化（${data.backend}）`;
+        genPromptHint.style.color = 'var(--success)';
+      } else {
+        genPromptHint.textContent = '❌ ' + (data.error || '优化失败');
+        genPromptHint.style.color = 'var(--error)';
+      }
+    } catch (e) {
+      genPromptHint.textContent = '❌ ' + fetchErrorMessage(e);
+      genPromptHint.style.color = 'var(--error)';
+    }
+    genOptimizeBtn.disabled = false;
+    setTimeout(() => { genPromptHint.textContent = ''; }, 4000);
+  });
+}
+
+// ── 批量生图 ──
+const genBtn = document.getElementById('genBtn');
+// 替换原有的单张生图 handler，支持批量模式
+if (genBtn) {
+  genBtn.onclick = async () => {
+    const promptText = genPrompt.value.trim();
+    if (!promptText) { genPromptHint.textContent = '请先输入 prompt'; return; }
+    genBtn.disabled = true;
+    genBtn.querySelector('.btn-text').textContent = '提交中…';
+
+    if (_genMode === 'batch') {
+      // 批量模式
+      const prompts = promptText.split('\n').map(s => s.trim()).filter(Boolean);
+      if (prompts.length === 0) { genBtn.disabled = false; genBtn.querySelector('.btn-text').textContent = '✨ 生成效果图'; return; }
+      genPromptHint.textContent = `📦 批量模式：${prompts.length} 个 prompt`;
+      try {
+        const formData = new FormData();
+        prompts.forEach((p, i) => formData.append('prompts', p));
+        formData.append('backend', document.getElementById('genBackend').value);
+        formData.append('size', document.getElementById('genSize').value);
+        formData.append('n', document.getElementById('genN').value);
+        if (genRefFileObj) formData.append('ref_image', genRefFileObj);
+        const resp = await apiFetch('/api/generate/batch', { method: 'POST', body: formData });
+        const data = await resp.json();
+        if (data.success) {
+          await pollBatchJob(data.batch_id, prompts);
+        } else {
+          genPromptHint.textContent = '❌ ' + (data.error || '提交失败');
+        }
+      } catch (e) {
+        genPromptHint.textContent = '❌ ' + fetchErrorMessage(e);
+      }
+    } else {
+      // 单张模式（原有逻辑）
+      genPromptHint.textContent = '✨ 生成中…';
+      try {
+        const formData = new FormData();
+        formData.append('prompt', promptText);
+        formData.append('backend', document.getElementById('genBackend').value);
+        formData.append('size', document.getElementById('genSize').value);
+        formData.append('n', document.getElementById('genN').value);
+        if (genRefFileObj) formData.append('ref_image', genRefFileObj);
+        const resp = await apiFetch('/api/generate/jobs', { method: 'POST', body: formData });
+        const data = await resp.json();
+        if (data.success) {
+          await genPollJob(data.job_id);
+        } else {
+          genPromptHint.textContent = '❌ ' + (data.error || '提交失败');
+        }
+      } catch (e) {
+        genPromptHint.textContent = '❌ ' + fetchErrorMessage(e);
+      }
+    }
+    genBtn.disabled = false;
+    genBtn.querySelector('.btn-text').textContent = '✨ 生成效果图';
+  };
+}
+
+async function pollBatchJob(batchId, prompts) {
+  const deadline = Date.now() + 120000;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const resp = await apiFetch('/api/generate/batch/' + batchId);
+      const job = await resp.json();
+      if (job.status === 'done') {
+        renderBatchResults(job);
+        return;
+      }
+      if (job.status === 'failed') {
+        genPromptHint.textContent = '❌ ' + (job.error || '批量失败');
+        return;
+      }
+      genPromptHint.textContent = job.progress || '批量处理中…';
+    } catch (e) { /* 继续轮询 */ }
+  }
+  genPromptHint.textContent = '⏰ 批量超时，请重试';
+}
+
+function renderBatchResults(job) {
+  const results = document.getElementById('genResults');
+  if (!results) return;
+  const images = job.images || [];
+  const errors = job.errors || [];
+  let html = `<div class="gen-batch-summary">📦 ${job.prompt_count} 个 prompt → ${images.length} 张图` +
+    (errors.length ? ` · ${errors.length} 个失败` : '') + ` · ${(job.elapsed_ms / 1000).toFixed(1)}s</div>`;
+  html += '<div class="gen-grid">';
+  images.forEach((img, idx) => {
+    const promptLabel = escapeHtml((img.prompt || '').slice(0, 60));
+    html += `<div class="gen-card" data-idx="${idx}">
+      <img src="data:image/png;base64,${img.png_base64}" class="gen-thumb" alt="批量图 ${idx + 1}"/>
+      <div class="gen-card-meta">${escapeHtml(img.backend)} · ${img.width}×${img.height}</div>
+      <div class="gen-card-prompt" title="${promptLabel}">${promptLabel}</div>
+      <div class="gen-card-actions">
+        <button class="btn btn-small" data-act="download">下载 PNG</button>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  if (errors.length) {
+    html += '<div class="gen-batch-errors">';
+    errors.forEach(e => {
+      html += `<div class="gen-batch-error-item">❌ ${escapeHtml((e.prompt || '').slice(0, 40))}: ${escapeHtml(e.error || '')}</div>`;
+    });
+    html += '</div>';
+  }
+  results.innerHTML = html;
+  results.querySelectorAll('.gen-card-actions .btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const card = btn.closest('.gen-card');
+      const idx = Number(card.dataset.idx);
+      const img = images[idx];
+      if (img) {
+        const a = document.createElement('a');
+        a.href = 'data:image/png;base64,' + img.png_base64;
+        a.download = `batch_${idx + 1}.png`;
+        a.click();
+      }
+    });
+  });
+}
+
+// ── 参考图库（localStorage）──
+const REF_GALLERY_KEY = 'colorflow_ref_gallery';
+
+function loadRefGallery() {
+  const items = document.getElementById('genRefGalleryItems');
+  const empty = document.getElementById('genRefGalleryEmpty');
+  if (!items) return;
+  let gallery = [];
+  try { gallery = JSON.parse(localStorage.getItem(REF_GALLERY_KEY) || '[]'); } catch (e) {}
+  if (gallery.length === 0) {
+    items.innerHTML = '<div class="key-empty">暂无保存的参考图</div>';
+    return;
+  }
+  items.innerHTML = gallery.map((item, i) =>
+    `<div class="gen-ref-gallery-item" data-idx="${i}" title="点击加载到反向闭环">
+      <img src="${item.dataUrl}" alt="参考图 ${i + 1}"/>
+      <button class="gen-ref-del" data-del="${i}" title="删除">×</button>
+    </div>`
+  ).join('');
+  items.querySelectorAll('.gen-ref-gallery-item').forEach(el => {
+    el.addEventListener('click', e => {
+      if (e.target.classList.contains('gen-ref-del')) return;
+      const idx = Number(el.dataset.idx);
+      const item = gallery[idx];
+      if (item && genReverseZone && genReverseFile) {
+        // 加载到反向闭环上传区
+        const resp = fetch(item.dataUrl).then(r => r.blob());
+        resp.then(blob => {
+          const file = new File([blob], item.name || 'reference.png', { type: 'image/png' });
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          genReverseFile.files = dt.files;
+          genReverseFile.dispatchEvent(new Event('change'));
+        });
+      }
+    });
+  });
+  items.querySelectorAll('.gen-ref-del').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const idx = Number(btn.dataset.del);
+      gallery.splice(idx, 1);
+      localStorage.setItem(REF_GALLERY_KEY, JSON.stringify(gallery));
+      loadRefGallery();
+    });
+  });
+}
+
+// 保存参考图到图库
+const genSaveRefBtn = document.getElementById('genSaveRefBtn');
+if (genSaveRefBtn) {
+  genSaveRefBtn.addEventListener('click', () => {
+    if (!genReverseFile || !genReverseFile.files || !genReverseFile.files[0]) return;
+    const file = genReverseFile.files[0];
+    const reader = new FileReader();
+    reader.onload = e => {
+      let gallery = [];
+      try { gallery = JSON.parse(localStorage.getItem(REF_GALLERY_KEY) || '[]'); } catch (err) {}
+      gallery.push({ name: file.name, dataUrl: e.target.result, size: file.size });
+      localStorage.setItem(REF_GALLERY_KEY, JSON.stringify(gallery));
+      loadRefGallery();
+      genPromptHint.textContent = `💾 已保存到图库（${gallery.length} 张）`;
+      genPromptHint.style.color = 'var(--success)';
+      setTimeout(() => { genPromptHint.textContent = ''; }, 2500);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// 清空图库
+const genRefGalleryClear = document.getElementById('genRefGalleryClear');
+if (genRefGalleryClear) {
+  genRefGalleryClear.addEventListener('click', () => {
+    if (confirm('确定清空所有保存的参考图？')) {
+      localStorage.removeItem(REF_GALLERY_KEY);
+      loadRefGallery();
+    }
+  });
+}
+
+// ── Prompt 模板市场（自定义模板 + 导入/导出）──
+const CUSTOM_TPL_KEY = 'colorflow_custom_templates';
+
+function loadCustomTemplates() {
+  try { return JSON.parse(localStorage.getItem(CUSTOM_TPL_KEY) || '[]'); }
+  catch (e) { return []; }
+}
+
+function saveCustomTemplates(tpls) {
+  localStorage.setItem(CUSTOM_TPL_KEY, JSON.stringify(tpls));
+}
+
+function mergeAllTemplates() {
+  return [..._genTplData, ...loadCustomTemplates()];
+}
+
+// 自定义模板创建
+const genTplCustomBtn = document.getElementById('genTplCustomBtn');
+if (genTplCustomBtn) {
+  genTplCustomBtn.addEventListener('click', () => {
+    const name = prompt('模板名称：', '我的模板');
+    if (!name) return;
+    const desc = prompt('模板描述（可选）：', '') || '';
+    const promptText = prompt('模板 Prompt（用 {} 定义参数）：', 'A {style} {color} gift box with {material} finish');
+    if (!promptText) return;
+    const params = prompt('参数列表（逗号分隔，格式：name=label）：', 'style=风格,color=主色,material=材质');
+    const paramDefs = {};
+    if (params) {
+      params.split(',').map(s => s.trim()).filter(Boolean).forEach(p => {
+        const [name, label] = p.split('=');
+        paramDefs[name.trim()] = { label: label || name.trim(), default: '', options: [] };
+      });
+    }
+    const tpls = loadCustomTemplates();
+    tpls.push({
+      id: 'custom_' + Date.now(),
+      name: name,
+      category: 'custom',
+      description: desc,
+      prompt: promptText,
+      params: paramDefs,
+      param_names: Object.keys(paramDefs),
+    });
+    saveCustomTemplates(tpls);
+    _genTplData = mergeAllTemplates();
+    renderTplSelect();
+    genPromptHint.textContent = `✅ 已创建自定义模板「${name}」`;
+    genPromptHint.style.color = 'var(--success)';
+    setTimeout(() => { genPromptHint.textContent = ''; }, 2500);
+  });
+}
+
+// 导出模板
+const genTplExportBtn = document.getElementById('genTplExportBtn');
+if (genTplExportBtn) {
+  genTplExportBtn.addEventListener('click', () => {
+    const tpls = loadCustomTemplates();
+    if (tpls.length === 0) { alert('暂无自定义模板可导出'); return; }
+    const blob = new Blob([JSON.stringify(tpls, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'colorflow_templates.json';
+    a.click();
+  });
+}
+
+// 导入模板
+const genTplImportBtn = document.getElementById('genTplImportBtn');
+const genTplImportFile = document.getElementById('genTplImportFile');
+if (genTplImportBtn) {
+  genTplImportBtn.addEventListener('click', () => genTplImportFile.click());
+}
+if (genTplImportFile) {
+  genTplImportFile.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const imported = JSON.parse(ev.target.result);
+        if (!Array.isArray(imported)) throw new Error('格式错误');
+        const existing = loadCustomTemplates();
+        // 去重（按 id）
+        const ids = new Set(existing.map(t => t.id));
+        const merged = [...existing, ...imported.filter(t => !ids.has(t.id))];
+        saveCustomTemplates(merged);
+        _genTplData = mergeAllTemplates();
+        renderTplSelect();
+        genPromptHint.textContent = `✅ 已导入 ${imported.length} 个模板`;
+        genPromptHint.style.color = 'var(--success)';
+      } catch (err) {
+        genPromptHint.textContent = '❌ 导入失败：' + err.message;
+        genPromptHint.style.color = 'var(--error)';
+      }
+      setTimeout(() => { genPromptHint.textContent = ''; }, 3000);
+    };
+    reader.readAsText(file);
+  });
+}

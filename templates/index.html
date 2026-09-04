@@ -675,14 +675,32 @@
             </div>
             <div class="gen-layout">
               <div class="gen-input">
+                <!-- 模式切换 -->
+                <div class="gen-mode-toggle">
+                  <label class="gen-mode-label">模式</label>
+                  <div class="gen-mode-btns">
+                    <button type="button" class="gen-mode-btn active" data-mode="single">单张</button>
+                    <button type="button" class="gen-mode-btn" data-mode="batch">批量</button>
+                  </div>
+                </div>
                 <div class="param-row">
-                  <label>生图描述</label>
-                  <textarea id="genPrompt" class="gen-prompt-input" rows="3" placeholder="红色天地盖礼盒，烫金logo，哑光材质，电商白底"></textarea>
+                  <label id="genPromptLabel">生图描述</label>
+                  <div class="gen-prompt-area">
+                    <textarea id="genPrompt" class="gen-prompt-input" rows="3" placeholder="红色天地盖礼盒，烫金logo，哑光材质，电商白底"></textarea>
+                    <button type="button" class="btn btn-small btn-secondary gen-optimize-btn" id="genOptimizeBtn">✨ 优化</button>
+                  </div>
+                  <p class="gen-hint" id="genPromptHint"></p>
                 </div>
                 <div class="gen-template-section">
                   <div class="gen-template-header">
                     <label>🎨 行业模板</label>
-                    <button type="button" class="btn btn-small btn-secondary" id="genTplToggle">展开</button>
+                    <div class="gen-tpl-actions">
+                      <button type="button" class="btn btn-small btn-secondary" id="genTplToggle">展开</button>
+                      <button type="button" class="btn btn-small btn-secondary" id="genTplCustomBtn" title="创建自定义模板">+ 自定义</button>
+                      <button type="button" class="btn btn-small btn-secondary" id="genTplExportBtn" title="导出自定义模板">导出</button>
+                      <button type="button" class="btn btn-small btn-secondary" id="genTplImportBtn" title="导入模板">导入</button>
+                      <input type="file" id="genTplImportFile" accept=".json" hidden />
+                    </div>
                   </div>
                   <div class="gen-template-body hidden" id="genTplBody">
                     <div class="param-row">
@@ -751,6 +769,19 @@
                     <span class="btn-text">🔍 提取 prompt</span>
                     <span class="btn-loader hidden">提取中...</span>
                   </button>
+                  <button class="btn btn-secondary btn-small" id="genSaveRefBtn" disabled>
+                    <span class="btn-text">💾 保存到图库</span>
+                  </button>
+                </div>
+                <!-- 参考图库 -->
+                <div class="gen-ref-gallery" id="genRefGallery">
+                  <div class="gen-ref-gallery-header">
+                    <label>📷 参考图库</label>
+                    <button type="button" class="btn btn-small btn-secondary" id="genRefGalleryClear">清空</button>
+                  </div>
+                  <div class="gen-ref-gallery-items" id="genRefGalleryItems">
+                    <div class="key-empty" id="genRefGalleryEmpty">暂无保存的参考图</div>
+                  </div>
                 </div>
                 <button class="btn btn-primary" id="genBtn" disabled>
                   <span class="btn-text">✨ 生成效果图</span>

@@ -955,6 +955,40 @@ def prompt_render(template_id: str, params: str = "") -> str:
         return json.dumps({"error": f"模板渲染失败: {e}"}, ensure_ascii=False)
 
 
+@mcp.tool()
+def prompt_optimize(prompt: str, backend: str = "auto") -> str:
+    """优化用户 prompt → 增强版英文 prompt（适合图像生成模型）。
+
+    用法：调用本工具优化 prompt，再把结果传给 generate_image / full_pipeline。
+    无 API Key 时自动降级 mock（纯字符串拼接，不调 API）。
+
+    Args:
+        prompt: 用户原始 prompt（中文/英文均可）
+        backend: auto / openai / mock（默认 auto）
+    Returns:
+        JSON: {success, prompt, backend, model, meta}
+    """
+    auth = _auth_check()
+    if auth:
+        return auth
+    from prompt_optimizer import dispatch_optimize, OptimizeError
+    if not prompt or not prompt.strip():
+        return json.dumps({"error": "prompt 不能为空"}, ensure_ascii=False)
+    try:
+        result = dispatch_optimize(prompt, backend=backend)
+        return json.dumps({
+            "success": True, "prompt": result.prompt,
+            "backend": result.backend, "model": result.model,
+            "meta": result.meta,
+        }, ensure_ascii=False)
+    except OptimizeError as e:
+        return json.dumps({"error": f"优化失败({e.code}): {e}",
+                           "code": e.code, "retryable": e.retryable},
+                          ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": f"优化失败: {e}"}, ensure_ascii=False)
+
+
 # ============================================================
 # 一句话流水线（Phase 2）：生图 → 抠图 → 描图 → Pantone → 报价 → ZIP
 # ============================================================
