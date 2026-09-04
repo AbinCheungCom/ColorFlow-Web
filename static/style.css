@@ -334,6 +334,12 @@ body {
   padding-bottom: 0;
   border-bottom: none;
 }
+.settings-action-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
 .settings-desc {
   font-size: 13px;
   font-weight: 330;
@@ -1164,9 +1170,30 @@ body {
   background: var(--block-mint); color: #156b38;
 }
 
-/* Modal 响应式：移动端导航栏隐藏，只显示当前页 */
+/* Modal 响应式：窄屏导航改为横向滚动标签栏（不可隐藏，否则「大模型 API」等页面无法进入） */
 @media (max-width: 640px) {
-  .settings-nav { display: none; }
+  .settings-modal-body {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .settings-nav {
+    width: 100%;
+    flex-direction: row;
+    gap: 4px;
+    padding: 8px;
+    border-right: none;
+    border-bottom: 1px solid var(--hairline-soft);
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-shrink: 0;
+  }
+  .settings-nav-item {
+    width: auto;
+    padding: 7px 11px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .settings-content { padding: 16px; }
   .settings-modal-container {
     width: 95vw;
     max-height: 85vh;
@@ -1504,6 +1531,33 @@ body {
   letter-spacing: 0.3px;
   margin-top: 2px;
 }
+.gen-hint.gen-warn {
+  color: #8a5a00;
+  background: rgba(255, 193, 7, 0.12);
+  border: 1px solid rgba(255, 193, 7, 0.4);
+  border-radius: var(--radius-md);
+  padding: 9px 11px;
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.6;
+}
+.gen-hint code {
+  font-size: 10.5px;
+  background: var(--surface-soft);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+}
+.gen-link {
+  color: var(--primary);
+  text-decoration: underline;
+  cursor: pointer;
+  font-family: inherit;
+  text-transform: none;
+}
 .gen-output {
   min-height: 240px;
 }
@@ -1576,7 +1630,20 @@ body {
   font-size: 13px;
 }
 .gen-backend-dot { font-size: 14px; }
-.gen-backend-label { color: var(--ink); }
+.gen-backend-label { color: var(--ink); flex: 1; }
+.gen-backend-model {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-sm);
+  padding: 2px 7px;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .gen-env-hint {
   font-size: 12px;
   line-height: 1.8;

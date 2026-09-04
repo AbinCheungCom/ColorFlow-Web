@@ -189,32 +189,48 @@ const settingsToggle = document.getElementById('settingsToggle');
 const settingsClose = document.getElementById('settingsClose');
 const settingsBackdrop = document.getElementById('settingsBackdrop');
 
-function openSettingsModal() {
+function openSettingsModal(nav) {
   settingsModal.classList.add('open');
   loadKeyList();
   updateMcpConfig();
   loadGenBackends();
   loadLLMKeys();
+  // 支持直接从其他页面跳到指定设置页（如 GEN 页提示 →「大模型 API」）
+  if (nav) switchSettingsPage(nav);
 }
 function closeSettingsModal() {
   settingsModal.classList.remove('open');
 }
 
-if (settingsToggle) settingsToggle.addEventListener('click', openSettingsModal);
+if (settingsToggle) settingsToggle.addEventListener('click', () => openSettingsModal());
 if (settingsClose) settingsClose.addEventListener('click', closeSettingsModal);
 if (settingsBackdrop) settingsBackdrop.addEventListener('click', closeSettingsModal);
+
+// 「去配置大模型 API」入口（事件委托：兼容动态生成的提示按钮）
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-open-settings]');
+  if (el) openSettingsModal(el.dataset.openSettings);
+});
 
 // 页面加载即动态填充 GEN 后端下拉（模型选项来自服务端，非硬编码）
 loadGenBackends();
 
 // === 设置页左侧导航栏切换 ===
+function switchSettingsPage(nav) {
+  document.querySelectorAll('.settings-nav-item').forEach(i =>
+    i.classList.toggle('active', i.dataset.nav === nav));
+  document.querySelectorAll('.settings-page').forEach(p => p.classList.remove('active'));
+  const page = document.getElementById('nav-' + nav);
+  if (page) page.classList.add('active');
+  // 按需刷新目标页数据
+  if (nav === 'apikey') loadKeyList();
+  if (nav === 'mcp') updateMcpConfig();
+  if (nav === 'gen') loadGenBackends();
+  if (nav === 'llm') loadLLMKeys();
+}
+
 document.querySelectorAll('.settings-nav-item').forEach(item => {
-  item.addEventListener('click', () => {
-    document.querySelectorAll('.settings-nav-item').forEach(i => i.classList.remove('active'));
-    document.querySelectorAll('.settings-page').forEach(p => p.classList.remove('active'));
-    item.classList.add('active');
-    document.getElementById('nav-' + item.dataset.nav).classList.add('active');
-  });
+  item.addEventListener('click', () => switchSettingsPage(item.dataset.nav));
 });
 
 // === 通用设置：重启服务 & 清除 API Key ===
@@ -1176,12 +1192,14 @@ async function loadGenBackends() {
       if (!data.success) {
         list.innerHTML = '<div class="key-empty">加载失败</div>';
       } else if (!avail.length) {
-        list.innerHTML = '<div class="key-empty">未配置任何生图后端 Key · 请在「大模型 API」页配置</div>';
+        list.innerHTML = '<div class="key-empty">未配置任何生图后端 Key<br/>'
+          + '<button class="btn btn-primary btn-small" data-open-settings="llm">🔑 去配置大模型 API Key →</button></div>';
       } else {
         list.innerHTML = backends.map(b => {
           const dot = b.available ? '✅' : '❌';
+          const model = b.model ? `<span class="gen-backend-model">${escapeHtml(b.model)}</span>` : '';
           return `<div class="gen-backend-row"><span class="gen-backend-dot">${dot}</span>
-            <span class="gen-backend-label">${escapeHtml(b.label)}</span></div>`;
+            <span class="gen-backend-label">${escapeHtml(b.label)}</span>${model}</div>`;
         }).join('');
       }
     }
@@ -1193,7 +1211,8 @@ async function loadGenBackends() {
       backends.forEach(b => {
         const opt = document.createElement('option');
         opt.value = b.id;
-        opt.textContent = b.label;
+        // 已配置后端显示当前模型名（来自设置页，非硬编码）
+        opt.textContent = b.available && b.model ? `${b.label} · ${b.model}` : b.label;
         if (!b.available) opt.disabled = true;
         sel.appendChild(opt);
       });
@@ -1201,6 +1220,21 @@ async function loadGenBackends() {
     }
     // 默认后端下拉同步
     if (data.default_backend && genBackend) genBackend.value = data.default_backend;
+    // GEN 页：显示当前命中后端的模型，或给出配置入口（避免选了后端却因无 Key 失败）
+    const needCfg = document.getElementById('genNeedConfig');
+    if (needCfg) {
+      const first = avail[0] || {};
+      if (avail.length) {
+        needCfg.innerHTML = `当前模型 · <b>${escapeHtml(first.label)}</b>` +
+          (first.model ? ` <code>${escapeHtml(first.model)}</code>` : '') +
+          '　·　<a class="gen-link" data-open-settings="llm">切换模型 / 换后端 →</a>';
+        needCfg.classList.remove('gen-warn');
+      } else {
+        needCfg.innerHTML = '⚠️ 尚未配置任何生图后端 Key，无法生成<br>' +
+          '<button class="btn btn-small btn-primary" data-open-settings="llm">🔑 去配置大模型 API Key →</button>';
+        needCfg.classList.add('gen-warn');
+      }
+    }
   } catch (e) {
     if (list) list.innerHTML = '<div class="key-empty">加载失败</div>';
   }

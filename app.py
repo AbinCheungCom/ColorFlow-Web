@@ -1198,15 +1198,30 @@ def _gen_job_worker(job_id, params):
 
 @app.route("/api/generate/backends", methods=["GET"])
 def gen_backends_status():
-    """返回已配置的生图后端状态（Key 不回显，仅 available 标志）"""
+    """返回已配置的生图后端状态（Key 不回显，仅 available 标志 + 当前模型名）"""
+    from llm_keys import llm_keystore
     avail = available_backends()
+    # 每个后端的默认模型（与服务端回退值一致），设置页 config.model 优先
+    defaults = {
+        "volcano": "doubao-seedream-4-0-t2i",
+        "fal": "fal-ai/flux-pro/v1.1",
+        "comfyui": "本地工作流",
+    }
+    env_models = {"volcano": "VOLCANO_MODEL", "fal": "FAL_MODEL"}
+
+    def _model_of(pid):
+        cfg = llm_keystore.get_config(pid) or {}
+        return (cfg.get("model")
+                or os.getenv(env_models.get(pid, ""), "").strip()
+                or defaults[pid])
+
     all_backends = [
         {"id": "volcano", "label": "火山方舟 · 即梦 Seedream（国内默认）",
-         "available": "volcano" in avail},
+         "available": "volcano" in avail, "model": _model_of("volcano")},
         {"id": "fal", "label": "fal.ai（海外 · 模型最全）",
-         "available": "fal" in avail},
+         "available": "fal" in avail, "model": _model_of("fal")},
         {"id": "comfyui", "label": "本地 ComfyUI（可选装）",
-         "available": "comfyui" in avail},
+         "available": "comfyui" in avail, "model": _model_of("comfyui")},
     ]
     default = os.getenv("GEN_DEFAULT_BACKEND", "auto")
     return jsonify({

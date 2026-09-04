@@ -224,13 +224,18 @@
                 <div class="gen-backends-list" id="genBackendsList">
                   <div class="key-empty">加载中...</div>
                 </div>
+                <div class="settings-action-row">
+                  <button class="btn btn-primary btn-small" data-open-settings="llm">🔑 去配置大模型 API Key →</button>
+                </div>
               </div>
               <div class="settings-section">
-                <p class="settings-desc">配置环境变量后重启服务生效，或通过「大模型 API」页管理（Key 仅存服务端，不进前端）</p>
+                <p class="settings-desc">推荐在「大模型 API」页填 Key（含模型名，保存即生效、重启不丢）；环境变量同样可用，优先级低于设置页</p>
                 <div class="gen-env-hint">
+                  <code>大模型 API</code> 页 · 火山方舟 / fal.ai / ComfyUI / OpenAI / Claude 的 Key + 模型名<br/>
                   <code>VOLCANO_API_KEY</code> · 火山方舟（国内默认）<br/>
                   <code>FAL_KEY</code> · fal.ai（海外）<br/>
-                  <code>COMFYUI_URL</code> · 本地 ComfyUI（可选装）
+                  <code>COMFYUI_URL</code> · 本地 ComfyUI（可选装）<br/>
+                  <code>VOLCANO_MODEL</code> / <code>FAL_MODEL</code> · 模型名覆盖
                 </div>
               </div>
             </div>
@@ -768,6 +773,7 @@
                   <span class="btn-loader hidden">生成中...</span>
                 </button>
                 <p class="gen-hint" id="genHint">生成图为灵感稿，印刷请走右侧生产链路</p>
+                <p class="gen-hint" id="genNeedConfig"></p>
               </div>
               <div class="gen-output">
                 <div class="gen-results" id="genResults">
