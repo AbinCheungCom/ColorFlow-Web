@@ -26,6 +26,7 @@ ColorFlow Web 是 **ColorFlow 矢量描图 SDK** 和 **Pantone 色彩管理** �
 | **3D 灰度图** | 彩色位图 → 灰度高度图 / 位移贴图（8/16-bit），用于 3D 建模（Blender / 3D 打印 / 深度通道）+ 实时直方图 |
 | **服务重启** | 设置页「重启服务」按钮一键重启 Flask 实例 |
 | **AI 生图** | 一句话生成包装效果图（火山方舟 / fal.ai / ComfyUI 三后端 auto 降级，零本地 GPU），生成图直接送抠图 / 描图 / Pantone 流水线 |
+| **图→prompt 反向闭环** | 上传参考图 → 多模态大模型（OpenAI gpt-4o / Claude / mock）自动描述 → 回填 prompt → 一键生图，完成「图→prompt→生图→描图→Pantone」全闭环 |
 | **AI Agent 接入** | 内置 MCP Server（12 工具），Claude Code / Cursor 可直接调用 |
 
 ## 技术栈
@@ -122,6 +123,49 @@ curl http://localhost:5000/api/generate/backends
 > 前端 Tab 6 统一走任务模式（提交 → 轮询，2s 间隔，3 分钟超时），进度文案实时刷新。
 > 任务存储为进程内（单进程 Flask）；多 worker 生产部署需换共享存储（Redis/DB）。
 
+## 图→prompt（VISION 适配器层 · image2prompt 反向闭环）
+
+与 GEN 对称设计：上传一张图 → 多模态大模型描述 → 返回结构化英文 prompt，前端可直接回填到 GEN 提示词框。对应 [docs/03-工作流集成方案.md](docs/03-工作流集成方案.md) 方案 B（P1），补齐「图→prompt→生图→描图→Pantone→报价→ZIP」全闭环。
+
+### 后端（按优先级 auto 降级）
+
+| 后端 | 环境变量 | 说明 |
+|------|---------|------|
+| openai | `OPENAI_API_KEY` | OpenAI Vision · gpt-4o（事实标准 VLM） |
+| claude | `ANTHROPIC_API_KEY` | Anthropic Claude（备选 VLM） |
+| mock | — | 零 Key 演示 / 测试，返回固定 prompt，不参与主链路 |
+
+`backend=auto` 时按 `openai → claude` 探测，**未配置任何真实 Key 时直接走 mock 降级**（不报错，`meta.fallback_from` 记录来源），绝不假成功。设置页「生图后端」标签同步显示 Vision 后端可用性。
+
+### 可选环境变量
+
+```bash
+export VISION_DEFAULT_BACKEND=auto      # 默认后端（auto/openai/claude/mock）
+export VISION_MODEL_OPENAI=gpt-4o       # OpenAI 模型名
+export VISION_MODEL_CLAUDE=claude-sonnet-4-6
+export OPENAI_BASE_URL=...              # 兼容代理（如 Azure/OpenRouter）
+export ANTHROPIC_BASE_URL=...           # 兼容代理
+export VISION_MAX_TOKENS=300            # 单次输出 token 上限
+```
+
+### 示例
+
+```bash
+# 图→prompt（multipart form）
+curl -X POST http://localhost:5000/api/prompt/generate \
+  -F "image=@reference.png" \
+  -F "backend=auto" \
+  -F "lang=en" -F "style=product"
+# → {"success":true,"prompt":"a clean product render...","backend":"openai","elapsed_ms":3421}
+
+# 查看已配置的 Vision 后端
+curl http://localhost:5000/api/prompt/backends
+```
+
+> 红线：Key 仅存服务端环境变量，不进前端；零本地 GPU；失败可降级不假成功。
+> 前端 Tab 6「反向闭环」上传区 → 「🔍 提取 prompt」按钮 → 自动回填 prompt 框并启用生成。
+> MCP 工具 `image_to_prompt` 与 `full_pipeline(image_path=...)` 支持一句话闭环。
+
 ## API Key 管理
 
 ### 生成 Key（推荐）
@@ -202,7 +246,7 @@ curl -X POST http://localhost:5000/api/restart
 }
 ```
 
-### 可用工具（13 个）
+### 可用工具（14 个）
 
 | Tool | 说明 | 关键参数 |
 |------|------|---------|
@@ -218,7 +262,8 @@ curl -X POST http://localhost:5000/api/restart
 | `export_pantone_pdf` | 色卡 / 匹配报告 PDF | export_type（swatch / report / palette）, 颜色数据 |
 | `greyscale3d` | 位图 → 3D 灰度高度图 / 位移贴图 | invert, contrast, gamma, smooth, auto_levels, bit_depth |
 | `generate_image` | AI 生成包装效果图（零本地 GPU）| prompt, backend（auto 降级）, ref_image_path, size, n |
-| `full_pipeline` | 一句话：生图→抠图→描图→Pantone→报价→ZIP | prompt, width_mm, height_mm, qty, colors, backend |
+| `image_to_prompt` | 图→prompt 反向闭环（OpenAI/Claude/mock，auto 降级）| image_path, backend, lang, style, model |
+| `full_pipeline` | 一句话：生图→抠图→描图→Pantone→报价→ZIP | prompt **或** image_path（图→prompt 自动推导）, width_mm, height_mm, qty, colors, backend, vision_backend |
 
 ### Agent 调用示例
 
@@ -254,6 +299,11 @@ Agent: 调用 generate_image("红色天地盖礼盒，烫金logo，哑光，电�
 Agent: 调用 full_pipeline("红色天地盖礼盒，烫金logo", width_mm=210,
          height_mm=297, qty=1000)
   → {success, zip_path: "colorflow_pipeline.zip", quote: {...}, files: [...]}
+
+用户: 「用这张参考图复刻一个产品效果图，再走完整流水线」
+Agent: 调用 full_pipeline(image_path="D:/reference.png", width_mm=210, height_mm=297)
+  → 自动经 image_to_prompt 推导 prompt，再生图→描图→Pantone→报价→ZIP
+  （等价于先调 image_to_prompt 再调 full_pipeline，但一次调用完成闭环）
 ```
 
 ## API 接口
@@ -274,6 +324,8 @@ Agent: 调用 full_pipeline("红色天地盖礼盒，烫金logo", width_mm=210,
 | `POST` | `/api/generate/jobs` | AI 生图（异步任务）→ `{job_id, status:"queued"}` |
 | `GET` | `/api/generate/jobs/<id>` | 查询任务状态 queued/running/done/failed（done 携 images）|
 | `GET` | `/api/generate/backends` | 生图后端状态（volcano/fal/comfyui 可用性）|
+| `GET` | `/api/prompt/backends` | 图→prompt 后端状态（openai/claude/mock 可用性）|
+| `POST` | `/api/prompt/generate` | 图→prompt（image2prompt）→ 英文 prompt，用于回填 GEN 提示词框 |
 | `POST` | `/api/restart` | 触发服务重启（异步启动 restart.ps1）|
 | `POST` | `/api/keys/generate` | 生成新 API Key |
 | `GET` | `/api/keys` | 列出所有 Key（脱敏）|
@@ -381,18 +433,19 @@ curl -X POST http://localhost:5000/api/restart
 
 ```
 colorflow-web/
-├── app.py               # Flask 入口，所有 API 路由 + Key 管理 + 3D 灰度图 + AI 生图(同步/任务) + 服务重启
+├── app.py               # Flask 入口，所有 API 路由 + Key 管理 + 3D 灰度图 + AI 生图(同步/任务) + 图→prompt + 服务重启
 ├── gen_backends.py      # GEN 生图适配器层（volcano / fal / comfyui + auto 降级 + GenResult/GenError）
+├── vision_backends.py   # VISION 图→prompt 适配器层（openai / claude / mock + auto 降级 + PromptResult/PromptError）
 ├── colorflow_keys.py    # KeyStore：API Key 生成 / 校验 / 撤销
-├── mcp_server.py        # MCP Server（13 工具 + Key 认证）
+├── mcp_server.py        # MCP Server（14 工具 + Key 认证）
 ├── colorflow_desktop_app.py   # 桌面入口（PyWebview 原生窗口 + Flask 线程）
 ├── colorflow_desktop_app.spec # PyInstaller 打包配置
 ├── restart.ps1          # 服务重启脚本（杀旧进程 + 拉起新实例）
 ├── templates/
-│   └── index.html      # 单页（抠图 / 描图 / Pantone / 色彩匹配 / 3D 灰度图 / AI 生图 + 设置页）
+│   └── index.html      # 单页（抠图 / 描图 / Pantone / 色彩匹配 / 3D 灰度图 / AI 生图+图→prompt 反向闭环 + 设置页）
 ├── static/
 │   ├── style.css       # Figma DESIGN.md 样式
-│   ├── app.js          # 前端交互 + Key 管理 + MCP 配置 + 3D 灰度图 + AI 生图(任务轮询)
+│   ├── app.js          # 前端交互 + Key 管理 + MCP 配置 + 3D 灰度图 + AI 生图(任务轮询) + 图→prompt 提取
 │   └── favicon.*       # 浏览器图标（ico/png/svg/manifest）
 ├── assets/
 │   └── gen_workflow_api.json  # ComfyUI 文生图工作流模板（可替换本机构造）
@@ -402,7 +455,7 @@ colorflow-web/
 │   ├── conftest.py     # 共享配置（U2NET_HOME 回退包内模型）
 │   ├── test_app.py     # API 集成测试 + Key 管理 + 3D 灰度图 + 抠图/忽略白色
 │   ├── test_mcp.py     # MCP Server 全工具测试
-│   └── test_gen.py     # GEN 生图适配器（mock 后端 + auto 降级 + 任务模式 + 流水线）
+│   └── test_gen.py     # GEN 生图适配器（mock 后端 + auto 降级 + 任务模式 + 流水线）+ VISION 图→prompt 反向闭环
 ├── .github/workflows/ci.yml  # GitHub Actions（pytest + zip 产物）
 ├── start.bat           # Windows 一键启动
 ├── DEPLOY.md           # 部署说明
@@ -414,7 +467,7 @@ colorflow-web/
 
 ```bash
 pip install pytest
-python -m pytest tests/ -q     # 128 个用例
+python -m pytest tests/ -q     # 151 个用例
 ```
 
 ## 相关项目

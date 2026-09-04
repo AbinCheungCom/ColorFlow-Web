@@ -74,10 +74,20 @@ python -m venv .venv
 | `GEN_DEFAULT_BACKEND` | 默认生图后端（auto / volcano / fal / comfyui，默认 auto）|
 | `GEN_TIMEOUT` | 生图超时秒数（默认 120）|
 | `GEN_MAX_IMAGES` | 单次最多生成张数（默认 4）|
+| `OPENAI_API_KEY` | OpenAI Vision Key（配置后启用 openai 图→prompt 后端，gpt-4o）|
+| `ANTHROPIC_API_KEY` | Anthropic Claude Key（配置后启用 claude 图→prompt 后端）|
+| `VISION_DEFAULT_BACKEND` | 默认图→prompt 后端（auto / openai / claude / mock，默认 auto）|
+| `VISION_MODEL_OPENAI` | OpenAI Vision 模型名（默认 gpt-4o）|
+| `VISION_MODEL_CLAUDE` | Claude 模型名（默认 claude-sonnet-4-6）|
+| `OPENAI_BASE_URL` | OpenAI 兼容代理地址（如 Azure / OpenRouter）|
+| `ANTHROPIC_BASE_URL` | Claude 兼容代理地址 |
+| `VISION_MAX_TOKENS` | 图→prompt 单次输出 token 上限（默认 300）|
 | `COLORFLOW_UPLOAD_DIR` | 上传临时目录（桌面封装时自动设置）|
 
-> 生图后端为**可插拔**：配置一个或多个 Key 即可，未配置的任何后端不影响既有功能。
-> 详见 README 的「AI 生图（GEN 适配器层）」章节。
+> 生图后端（volcano/fal/comfyui）与图→prompt 后端（openai/claude）均为**可插拔**：
+> 配置一个或多个 Key 即可，未配置的任何后端不影响既有功能；未配真实 Key 时
+> 图→prompt 自动降级 mock（不报错，`meta.fallback_from` 记录来源）。
+> 详见 README 的「AI 生图（GEN 适配器层）」与「图→prompt（VISION 适配器层）」章节。
 
 ## 桌面打包（PyWebview + PyInstaller）
 
