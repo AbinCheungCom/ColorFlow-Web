@@ -51,6 +51,18 @@ def _get_base(provider: str, default: str) -> str:
     env_map = {"volcano": "VOLCANO_BASE_URL", "fal": "FAL_BASE_URL", "comfyui": "COMFYUI_URL"}
     return os.getenv(env_map.get(provider, ""), "") or default
 
+
+def _get_model(provider: str, env_key: str, default: str) -> str:
+    """读取模型名：设置页 Key Store config.model → 环境变量 → 默认值。"""
+    try:
+        from llm_keys import llm_keystore
+        cfg = llm_keystore.get_config(provider)
+        if cfg and isinstance(cfg, dict) and cfg.get("model"):
+            return cfg["model"]
+    except Exception:
+        pass
+    return _env(env_key) or default
+
 # ── 后端优先级（auto 模式按此顺序探测）──────────────────────────────
 _BACKEND_PRIORITY = ("volcano", "fal", "comfyui")
 
@@ -199,7 +211,7 @@ def _gen_volcano(prompt: str, ref_image: bytes = None,
     if not key:
         raise GenError("auth", "未配置火山方舟 API Key", retryable=False)
     if not model:
-        model = _env("VOLCANO_MODEL") or "doubao-seedream-4-0-t2i"
+        model = _get_model("volcano", "VOLCANO_MODEL", "doubao-seedream-4-0-t2i")
     w, h = _parse_size(size)
 
     body = {
@@ -256,7 +268,7 @@ def _gen_fal(prompt: str, ref_image: bytes = None,
     if not key:
         raise GenError("auth", "未配置 FAL_KEY", retryable=False)
     if not model:
-        model = _env("FAL_MODEL") or "fal-ai/flux-pro/v1.1"
+        model = _get_model("fal", "FAL_MODEL", "fal-ai/flux-pro/v1.1")
     w, h = _parse_size(size)
 
     submit_url = f"https://queue.fal.run/{model}"

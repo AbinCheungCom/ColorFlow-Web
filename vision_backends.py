@@ -78,6 +78,18 @@ def _get_base(provider: str, default: str = "") -> str:
     return default
 
 
+def _get_model(provider: str, env_key: str, default: str) -> str:
+    """读取模型名：设置页 Key Store config.model → 环境变量 → 默认值。"""
+    try:
+        from llm_keys import llm_keystore
+        cfg = llm_keystore.get_config(provider)
+        if cfg and isinstance(cfg, dict) and cfg.get("model"):
+            return cfg["model"]
+    except Exception:
+        pass
+    return _env(env_key) or default
+
+
 def _http_json(url: str, method: str = "POST", headers: dict = None,
                body: dict = None, timeout: int = 120) -> dict:
     """发起 JSON 请求并解析 JSON 响应（urllib 实现，无额外依赖）。"""
@@ -163,7 +175,7 @@ def openai_backend(prompt: str, image: bytes, timeout: int = 120, model: str = "
     if not api_key:
         raise PromptError("auth", "OpenAI API Key 未配置（设置页「大模型 API」或环境变量 OPENAI_API_KEY）", retryable=False)
     base_url = _get_base("openai") or _env("OPENAI_BASE_URL") or "https://api.openai.com/v1"
-    model = model or _env("VISION_MODEL_OPENAI") or "gpt-4o"
+    model = model or _get_model("openai", "VISION_MODEL_OPENAI", "gpt-4o")
 
     t0 = time.time()
     data_url = _image_to_data_url(image)
@@ -206,7 +218,7 @@ def claude_backend(prompt: str, image: bytes, timeout: int = 120, model: str = "
     if not api_key:
         raise PromptError("auth", "Claude API Key 未配置（设置页「大模型 API」或环境变量 ANTHROPIC_API_KEY）", retryable=False)
     base_url = _get_base("claude") or _env("ANTHROPIC_BASE_URL") or "https://api.anthropic.com"
-    model = model or _env("VISION_MODEL_CLAUDE") or "claude-sonnet-4-6"
+    model = model or _get_model("claude", "VISION_MODEL_CLAUDE", "claude-sonnet-4-6")
 
     t0 = time.time()
     b64 = base64.b64encode(image).decode("ascii")

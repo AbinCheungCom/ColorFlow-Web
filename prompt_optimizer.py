@@ -100,6 +100,18 @@ def _get_base(provider: str, default: str) -> str:
     return _env(env_key) or default
 
 
+def _get_model(provider: str, env_key: str, default: str) -> str:
+    """读取模型名：设置页 Key Store config.model → 环境变量 → 默认值。"""
+    try:
+        from llm_keys import llm_keystore
+        cfg = llm_keystore.get_config(provider)
+        if cfg and isinstance(cfg, dict) and cfg.get("model"):
+            return cfg["model"]
+    except Exception:
+        pass
+    return _env(env_key) or default
+
+
 def _mock_optimize(prompt: str) -> OptimizeResult:
     # 简单启发式增强：添加常用图像生成修饰词
     enhanced = (
@@ -126,7 +138,7 @@ def _openai_optimize(prompt: str, model: str = "", timeout: int = 60) -> Optimiz
     if not api_key:
         raise OptimizeError("auth", "OpenAI API Key 未配置", retryable=False)
     base_url = _get_base("openai", "https://api.openai.com/v1")
-    model = model or _env("VISION_MODEL_OPENAI") or "gpt-4o"
+    model = model or _get_model("openai", "VISION_MODEL_OPENAI", "gpt-4o")
 
     t0 = time.time()
     body = {

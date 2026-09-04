@@ -93,6 +93,31 @@ class TestLLMKeyStore:
         cfg = self.store.get_config("openai")
         assert cfg == {}
 
+    def test_model_persisted_in_config(self):
+        """config.model 应随 key 一起持久化，list_all 能读回"""
+        self.store.set_key("openai", "sk-test", config={"model": "gpt-4o-mini"})
+        cfg = self.store.get_config("openai")
+        assert cfg.get("model") == "gpt-4o-mini"
+        # 新实例读同一文件
+        from llm_keys import LLMKeyStore
+        store2 = LLMKeyStore(path=self.tmpfile)
+        cfg2 = store2.get_config("openai")
+        assert cfg2.get("model") == "gpt-4o-mini"
+        # list_all 的 model 字段 = config.model（覆盖默认）
+        info = next(p for p in store2.list_all() if p["provider"] == "openai")
+        assert info["model"] == "gpt-4o-mini"
+
+    def test_list_all_default_model_fallback(self):
+        """未配置时 list_all.model 回退到 PROVIDERS.default_model"""
+        from llm_keys import PROVIDERS
+        info = next(p for p in self.store.list_all() if p["provider"] == "volcano")
+        assert info["model"] == PROVIDERS["volcano"]["default_model"]
+        assert info["default_model"] == PROVIDERS["volcano"]["default_model"]
+
+    def test_list_all_exposes_key_prefix(self):
+        info = next(p for p in self.store.list_all() if p["provider"] == "openai")
+        assert info["key_prefix"] == "sk-"
+
 
 # ============================================================
 # Flask API 端点测试
@@ -177,6 +202,50 @@ class TestLLMKeysAPI:
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["success"] is True
+        assert data["base_url"] == "https://proxy.example.com/v1"
+
+    def test_set_with_model_and_base(self, client):
+        """设置 key + config{base_url,model} 后 GET 列表能读回模型名"""
+        resp = client.post("/api/llm-keys", json={
+            "provider": "openai",
+            "key": "sk-model-test",
+            "config": {"base_url": "https://proxy.example.com/v1",
+                       "model": "gpt-4o-mini"},
+        })
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["model"] == "gpt-4o-mini"
+        # GET 列表读回
+        resp = client.get("/api/llm-keys")
+        info = next(p for p in resp.get_json()["providers"]
+                    if p["provider"] == "openai")
+        assert info["has_key"] is True
+        assert info["model"] == "gpt-4o-mini"
+        assert info["base_url"] == "https://proxy.example.com/v1"
+
+    def test_set_model_merge_keeps_existing_config(self, client):
+        """更新时只覆盖传入字段，已有 config 保留"""
+        client.post("/api/llm-keys", json={
+            "provider": "volcano", "key": "volc-a",
+            "config": {"base_url": "https://a.example.com", "model": "seedream-x"},
+        })
+        # 仅改 model
+        client.post("/api/llm-keys", json={
+            "provider": "volcano", "key": "volc-b",
+            "config": {"model": "seedream-y"},
+        })
+        resp = client.get("/api/llm-keys")
+        info = next(p for p in resp.get_json()["providers"]
+                    if p["provider"] == "volcano")
+        assert info["model"] == "seedream-y"
+        assert info["base_url"] == "https://a.example.com"
+
+    def test_list_default_model_aligns_gen(self, client):
+        """volcano/fal 默认模型应与生图后端实际默认一致（非 seedream-2.0 旧值）"""
+        resp = client.get("/api/llm-keys")
+        providers = {p["provider"]: p for p in resp.get_json()["providers"]}
+        assert providers["volcano"]["default_model"] == "doubao-seedream-4-0-t2i"
+        assert providers["fal"]["default_model"] == "fal-ai/flux-pro/v1.1"
 
     def test_list_shows_set_key(self, client):
         # 设置 key

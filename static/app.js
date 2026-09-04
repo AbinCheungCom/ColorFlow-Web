@@ -204,6 +204,9 @@ if (settingsToggle) settingsToggle.addEventListener('click', openSettingsModal);
 if (settingsClose) settingsClose.addEventListener('click', closeSettingsModal);
 if (settingsBackdrop) settingsBackdrop.addEventListener('click', closeSettingsModal);
 
+// 页面加载即动态填充 GEN 后端下拉（模型选项来自服务端，非硬编码）
+loadGenBackends();
+
 // === 设置页左侧导航栏切换 ===
 document.querySelectorAll('.settings-nav-item').forEach(item => {
   item.addEventListener('click', () => {
@@ -1163,26 +1166,31 @@ if (genReverseBtn) {
 // 后端状态面板（设置页 nav-gen）
 async function loadGenBackends() {
   const list = document.getElementById('genBackendsList');
-  if (!list) return;
   try {
     const resp = await apiFetch('/api/generate/backends');
     const data = await resp.json();
-    if (!data.success) { list.innerHTML = '<div class="key-empty">加载失败</div>'; return; }
-    if (!data.any_configured) {
-      list.innerHTML = '<div class="key-empty">未配置任何生图后端 Key · 请在「大模型 API」页配置</div>';
-      return;
+    const backends = (data.success && Array.isArray(data.backends)) ? data.backends : [];
+    const avail = backends.filter(b => b.available);
+    // 状态面板（设置页 nav-gen）
+    if (list) {
+      if (!data.success) {
+        list.innerHTML = '<div class="key-empty">加载失败</div>';
+      } else if (!avail.length) {
+        list.innerHTML = '<div class="key-empty">未配置任何生图后端 Key · 请在「大模型 API」页配置</div>';
+      } else {
+        list.innerHTML = backends.map(b => {
+          const dot = b.available ? '✅' : '❌';
+          return `<div class="gen-backend-row"><span class="gen-backend-dot">${dot}</span>
+            <span class="gen-backend-label">${escapeHtml(b.label)}</span></div>`;
+        }).join('');
+      }
     }
-    list.innerHTML = data.backends.map(b => {
-      const dot = b.available ? '✅' : '❌';
-      return `<div class="gen-backend-row"><span class="gen-backend-dot">${dot}</span>
-        <span class="gen-backend-label">${escapeHtml(b.label)}</span></div>`;
-    }).join('');
-    // 动态填充后端下拉框（保留 auto 选项）
+    // 后端下拉框始终按服务端数据重建（不依赖 HTML 硬编码列表），未配置的置灰
     const sel = document.getElementById('genBackend');
     if (sel) {
       const currentVal = sel.value || 'auto';
       sel.innerHTML = '<option value="auto">自动（按优先级降级）</option>';
-      data.backends.forEach(b => {
+      backends.forEach(b => {
         const opt = document.createElement('option');
         opt.value = b.id;
         opt.textContent = b.label;
@@ -1194,7 +1202,7 @@ async function loadGenBackends() {
     // 默认后端下拉同步
     if (data.default_backend && genBackend) genBackend.value = data.default_backend;
   } catch (e) {
-    list.innerHTML = '<div class="key-empty">加载失败</div>';
+    if (list) list.innerHTML = '<div class="key-empty">加载失败</div>';
   }
 }
 
@@ -1215,6 +1223,8 @@ async function loadLLMKeys() {
       const dot = p.has_key ? '✅' : '⚪';
       const preview = p.key_masked ? ` · ${p.key_masked}` : '';
       const uses = (p.uses || []).map(u => ({gen:'生图',vision:'图→prompt',optimize:'优化'}[u]||u)).join('、');
+      const keyPh = p.key_prefix ? p.key_prefix + 'xxxxxxxx' : 'API Key';
+      const modelPh = p.default_model ? `模型（默认 ${p.default_model}）` : '模型名（可选）';
       return `<div class="llm-key-item">
         <div class="llm-key-header">
           <span class="llm-key-dot">${dot}</span>
@@ -1224,9 +1234,11 @@ async function loadLLMKeys() {
         </div>
         <div class="llm-key-form">
           <input type="password" id="llmKey_${escapeHtml(p.provider)}" class="key-input"
-            placeholder="${escapeHtml(p.key_prefix || 'API Key')}" />
+            placeholder="${escapeHtml(keyPh)}" />
           <input type="text" id="llmBase_${escapeHtml(p.provider)}" class="key-input"
             placeholder="Base URL（可选）" value="${escapeHtml(p.base_url || '')}" />
+          <input type="text" id="llmModel_${escapeHtml(p.provider)}" class="key-input"
+            placeholder="${escapeHtml(modelPh)}" value="${escapeHtml(p.model || '')}" />
           <div class="key-input-actions">
             <button class="btn btn-small btn-secondary" id="llmSave_${escapeHtml(p.provider)}">保存</button>
             <button class="btn btn-small btn-secondary" id="llmToggle_${escapeHtml(p.provider)}">显示</button>
@@ -1243,7 +1255,8 @@ async function loadLLMKeys() {
       const removeBtn = document.getElementById('llmRemove_'+p.provider);
       const keyInput = document.getElementById('llmKey_'+p.provider);
       const baseInput = document.getElementById('llmBase_'+p.provider);
-      if (saveBtn) saveBtn.addEventListener('click', () => saveLLMKey(p.provider, keyInput, baseInput));
+      const modelInput = document.getElementById('llmModel_'+p.provider);
+      if (saveBtn) saveBtn.addEventListener('click', () => saveLLMKey(p.provider, keyInput, baseInput, modelInput));
       if (toggleBtn) toggleBtn.addEventListener('click', () => {
         const isPwd = keyInput.type === 'password';
         keyInput.type = isPwd ? 'text' : 'password';
@@ -1256,12 +1269,16 @@ async function loadLLMKeys() {
   }
 }
 
-async function saveLLMKey(provider, keyInput, baseInput) {
+async function saveLLMKey(provider, keyInput, baseInput, modelInput) {
   const key = (keyInput ? keyInput.value : '').trim();
   const base = (baseInput ? baseInput.value : '').trim();
+  const model = (modelInput ? modelInput.value : '').trim();
   const hint = document.getElementById('llmHint_'+provider);
   const payload = { provider, key };
-  if (base) payload.config = { base_url: base };
+  const config = {};
+  if (base) config.base_url = base;
+  if (model) config.model = model;
+  if (Object.keys(config).length) payload.config = config;
   try {
     const resp = await apiFetch('/api/llm-keys', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

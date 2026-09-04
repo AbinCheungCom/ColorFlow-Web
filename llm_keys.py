@@ -58,7 +58,7 @@ PROVIDERS = {
         "env_key": "VOLCANO_API_KEY",
         "env_base": "VOLCANO_BASE_URL",
         "default_base": "",
-        "default_model": "seedream-2.0",
+        "default_model": "doubao-seedream-4-0-t2i",
     },
     "fal": {
         "label": "fal.ai",
@@ -68,7 +68,7 @@ PROVIDERS = {
         "env_key": "FAL_KEY",
         "env_base": "FAL_BASE_URL",
         "default_base": "https://fal.run",
-        "default_model": "",
+        "default_model": "fal-ai/flux-pro/v1.1",
     },
     "comfyui": {
         "label": "本地 ComfyUI",
@@ -192,6 +192,9 @@ class LLMKeyStore:
                 "label": info["label"],
                 "icon": info["icon"],
                 "uses": info["uses"],
+                "key_prefix": info.get("key_prefix", ""),
+                "env_key": info.get("env_key", ""),
+                "default_model": info.get("default_model", ""),
                 "has_key": has_key,
                 "key_masked": _mask_key(entry.get("key", ""), pid) if has_key else "",
                 "name": entry.get("name", ""),

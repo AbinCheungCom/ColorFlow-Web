@@ -1815,26 +1815,44 @@ def llm_keys_set():
         return jsonify({"error": f"未知 provider: {provider}", "valid": list(PROVIDERS.keys())}), 400
 
     if not key:
-        # 空串 = 清除
+        # 空串 = 清除（同时清除运行时环境变量）
         llm_keystore.remove(provider)
+        for env_name in (PROVIDERS[provider].get("env_key", ""),
+                         PROVIDERS[provider].get("env_base", "")):
+            if env_name:
+                os.environ.pop(env_name, None)
         return jsonify({"success": True, "action": "removed", "provider": provider})
 
+    # 合并已有 config，仅覆盖传入字段（base_url / model 持久化到 Key Store）
+    existing_cfg = dict(llm_keystore.get_config(provider) or {})
+    if isinstance(config, dict):
+        for k in ("base_url", "model"):
+            v = (config.get(k) or "").strip() if isinstance(config.get(k), str) else ""
+            if v:
+                existing_cfg[k] = v
+
     try:
-        result = llm_keystore.set_key(provider, key)
+        result = llm_keystore.set_key(provider, key, config=existing_cfg)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
-    # 同步 base_url 到环境变量（运行时可见）
-    if config.get("base_url"):
+    # 同步环境变量（运行时可见，无需重启）
+    if existing_cfg.get("base_url"):
         env_key = PROVIDERS[provider].get("env_base", "")
         if env_key:
-            os.environ[env_key] = config["base_url"]
+            os.environ[env_key] = existing_cfg["base_url"]
+    model_env = {"openai": "VISION_MODEL_OPENAI", "claude": "VISION_MODEL_CLAUDE",
+                 "volcano": "VOLCANO_MODEL", "fal": "FAL_MODEL"}.get(provider, "")
+    if existing_cfg.get("model") and model_env:
+        os.environ[model_env] = existing_cfg["model"]
 
     return jsonify({
         "success": True,
         "action": "set",
         "provider": provider,
         "key_preview": result.get("key", "")[:8] + "…",
+        "model": existing_cfg.get("model", ""),
+        "base_url": existing_cfg.get("base_url", ""),
     })
 
 
