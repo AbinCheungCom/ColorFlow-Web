@@ -246,7 +246,7 @@ curl -X POST http://localhost:5000/api/restart
 }
 ```
 
-### 可用工具（14 个）
+### 可用工具（16 个）
 
 | Tool | 说明 | 关键参数 |
 |------|------|---------|
@@ -264,6 +264,8 @@ curl -X POST http://localhost:5000/api/restart
 | `generate_image` | AI 生成包装效果图（零本地 GPU）| prompt, backend（auto 降级）, ref_image_path, size, n |
 | `image_to_prompt` | 图→prompt 反向闭环（OpenAI/Claude/mock，auto 降级）| image_path, backend, lang, style, model |
 | `full_pipeline` | 一句话：生图→抠图→描图→Pantone→报价→ZIP | prompt **或** image_path（图→prompt 自动推导）, width_mm, height_mm, qty, colors, backend, vision_backend |
+| `prompt_templates` | 列出行业预制 prompt 模板（按分类分组）| category, search |
+| `prompt_render` | 渲染模板 → 完整英文 prompt | template_id, params（JSON 字符串）|
 
 ### Agent 调用示例
 
@@ -326,6 +328,9 @@ Agent: 调用 full_pipeline(image_path="D:/reference.png", width_mm=210, height_
 | `GET` | `/api/generate/backends` | 生图后端状态（volcano/fal/comfyui 可用性）|
 | `GET` | `/api/prompt/backends` | 图→prompt 后端状态（openai/claude/mock 可用性）|
 | `POST` | `/api/prompt/generate` | 图→prompt（image2prompt）→ 英文 prompt，用于回填 GEN 提示词框 |
+| `GET` | `/api/prompt-templates` | 列出行业预制 prompt 模板（可按 category/search 过滤）|
+| `GET` | `/api/prompt-templates/<id>` | 获取单个模板完整定义（含 prompt 原文和 params）|
+| `POST` | `/api/prompt-templates/render` | 渲染模板 → 完整 prompt（支持 JSON 和 form 两种提交）|
 | `POST` | `/api/restart` | 触发服务重启（异步启动 restart.ps1）|
 | `POST` | `/api/keys/generate` | 生成新 API Key |
 | `GET` | `/api/keys` | 列出所有 Key（脱敏）|
@@ -436,8 +441,9 @@ colorflow-web/
 ├── app.py               # Flask 入口，所有 API 路由 + Key 管理 + 3D 灰度图 + AI 生图(同步/任务) + 图→prompt + 服务重启
 ├── gen_backends.py      # GEN 生图适配器层（volcano / fal / comfyui + auto 降级 + GenResult/GenError）
 ├── vision_backends.py   # VISION 图→prompt 适配器层（openai / claude / mock + auto 降级 + PromptResult/PromptError）
+├── prompt_templates.py  # Prompt 模板库加载器（assets/prompt_templates.json → render）
 ├── colorflow_keys.py    # KeyStore：API Key 生成 / 校验 / 撤销
-├── mcp_server.py        # MCP Server（14 工具 + Key 认证）
+├── mcp_server.py        # MCP Server（16 工具 + Key 认证）
 ├── colorflow_desktop_app.py   # 桌面入口（PyWebview 原生窗口 + Flask 线程）
 ├── colorflow_desktop_app.spec # PyInstaller 打包配置
 ├── restart.ps1          # 服务重启脚本（杀旧进程 + 拉起新实例）
@@ -449,6 +455,7 @@ colorflow-web/
 │   └── favicon.*       # 浏览器图标（ico/png/svg/manifest）
 ├── assets/
 │   └── gen_workflow_api.json  # ComfyUI 文生图工作流模板（可替换本机构造）
+│   └── prompt_templates.json  # 行业预制 prompt 模板库（12 模板 · 6 分类）
 ├── models/
 │   └── silueta.onnx    # 抠图模型（42MB，随包附带）
 ├── tests/
@@ -456,6 +463,7 @@ colorflow-web/
 │   ├── test_app.py     # API 集成测试 + Key 管理 + 3D 灰度图 + 抠图/忽略白色
 │   ├── test_mcp.py     # MCP Server 全工具测试
 │   └── test_gen.py     # GEN 生图适配器（mock 后端 + auto 降级 + 任务模式 + 流水线）+ VISION 图→prompt 反向闭环
+│   └── test_prompt_templates.py  # Prompt 模板库（模块/API/MCP 全量测试）
 ├── .github/workflows/ci.yml  # GitHub Actions（pytest + zip 产物）
 ├── start.bat           # Windows 一键启动
 ├── DEPLOY.md           # 部署说明
@@ -467,7 +475,7 @@ colorflow-web/
 
 ```bash
 pip install pytest
-python -m pytest tests/ -q     # 151 个用例
+python -m pytest tests/ -q     # 186 个用例
 ```
 
 ## 相关项目

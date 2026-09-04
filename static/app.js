@@ -1347,3 +1347,137 @@ if (genResults) {
     }
   });
 }
+
+// ============================================================
+// 行业 Prompt 模板库（Phase 4 · 预制 prompt → GEN）
+// ============================================================
+const genTplToggle = document.getElementById('genTplToggle');
+const genTplBody = document.getElementById('genTplBody');
+const genTplSelect = document.getElementById('genTplSelect');
+const genTplParams = document.getElementById('genTplParams');
+const genTplApply = document.getElementById('genTplApply');
+const genTplHint = document.getElementById('genTplHint');
+
+let _genTplData = [];  // 已加载的模板数据
+
+if (genTplToggle) {
+  genTplToggle.addEventListener('click', () => {
+    const hidden = genTplBody.classList.contains('hidden');
+    genTplBody.classList.toggle('hidden');
+    genTplToggle.textContent = hidden ? '收起' : '展开';
+    if (hidden && _genTplData.length === 0) loadGenTemplates();
+  });
+}
+
+async function loadGenTemplates() {
+  try {
+    const resp = await apiFetch('/api/prompt-templates');
+    const data = await resp.json();
+    if (!data.success) return;
+    _genTplData = data.templates || [];
+    // 填充下拉（按 category 分组）
+    const cats = data.categories || [];
+    let html = '<option value="">— 选择模板 —</option>';
+    cats.forEach(cat => {
+      const tpls = _genTplData.filter(t => t.category === cat.id);
+      if (tpls.length === 0) return;
+      html += `<optgroup label="${cat.icon} ${cat.name}">`;
+      tpls.forEach(t => {
+        html += `<option value="${t.id}">${t.name}</option>`;
+      });
+      html += '</optgroup>';
+    });
+    genTplSelect.innerHTML = html;
+  } catch (e) {
+    genTplHint.textContent = '模板加载失败：' + fetchErrorMessage(e);
+  }
+}
+
+if (genTplSelect) {
+  genTplSelect.addEventListener('change', () => {
+    const sel = _genTplData.find(t => t.id === genTplSelect.value);
+    if (!sel) {
+      genTplParams.innerHTML = '';
+      genTplApply.disabled = true;
+      genTplHint.textContent = '';
+      return;
+    }
+    // 获取完整模板定义（含 params）
+    apiFetch('/api/prompt-templates/' + encodeURIComponent(sel.id))
+      .then(r => r.json())
+      .then(data => {
+        if (!data.success) return;
+        renderTplParams(data.template);
+      })
+      .catch(e => { genTplHint.textContent = '模板详情加载失败'; });
+  });
+}
+
+function renderTplParams(template) {
+  const params = template.params || {};
+  let html = '';
+  for (const [name, def] of Object.entries(params)) {
+    const opts = (def.options || []).map(o => `<option value="${o}">${o}</option>`).join('');
+    html += `<div class="param-row tpl-param-row">
+      <label>${escapeHtml(def.label || name)}</label>
+      <select class="tpl-param-select" data-param="${name}">
+        <option value="${def.default}">${def.default}</option>
+        ${opts}
+      </select>
+    </div>`;
+  }
+  html += '<p class="tpl-prompt-preview" id="genTplPreview"></p>';
+  genTplParams.innerHTML = html;
+  genTplApply.disabled = false;
+  // 实时预览（占位符替换）
+  genTplParams.querySelectorAll('.tpl-param-select').forEach(sel => {
+    sel.addEventListener('change', () => updateTplPreview(template));
+  });
+  updateTplPreview(template);
+}
+
+function updateTplPreview(template) {
+  let prompt = template.prompt || '';
+  const selects = genTplParams.querySelectorAll('.tpl-param-select');
+  const used = {};
+  selects.forEach(sel => {
+    const val = sel.value;
+    used[sel.dataset.param] = val;
+    prompt = prompt.replace('{' + sel.dataset.param + '}', val);
+  });
+  const preview = document.getElementById('genTplPreview');
+  if (preview) preview.textContent = '📝 ' + prompt;
+  genTplHint.textContent = '点击「应用模板」回填到上方 prompt 框';
+}
+
+if (genTplApply) {
+  genTplApply.addEventListener('click', async () => {
+    const sel = _genTplData.find(t => t.id === genTplSelect.value);
+    if (!sel) return;
+    // 收集参数
+    const params = {};
+    genTplParams.querySelectorAll('.tpl-param-select').forEach(s => {
+      params[s.dataset.param] = s.value;
+    });
+    try {
+      const formData = new FormData();
+      formData.append('template_id', genTplSelect.value);
+      Object.entries(params).forEach(([k, v]) => formData.append('param_' + k, v));
+      const resp = await apiFetch('/api/prompt-templates/render', { method: 'POST', body: formData });
+      const data = await resp.json();
+      if (!data.success) { genTplHint.textContent = '渲染失败：' + (data.error || ''); return; }
+      if (genPrompt) {
+        genPrompt.value = data.prompt;
+        genBtn.disabled = false;
+      }
+      genHint.textContent = '🎨 prompt 已由模板「' + data.template_name + '」生成，可直接生成或微调后再生成';
+    } catch (e) {
+      genTplHint.textContent = '渲染失败：' + fetchErrorMessage(e);
+    }
+  });
+}
+
+if (genTplSelect && !genTplSelect.value) {
+  // 初始加载
+  loadGenTemplates();
+}

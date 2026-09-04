@@ -621,6 +621,23 @@
                   <label>生图描述</label>
                   <textarea id="genPrompt" class="gen-prompt-input" rows="3" placeholder="红色天地盖礼盒，烫金logo，哑光材质，电商白底"></textarea>
                 </div>
+                <div class="gen-template-section">
+                  <div class="gen-template-header">
+                    <label>🎨 行业模板</label>
+                    <button type="button" class="btn btn-small btn-secondary" id="genTplToggle">展开</button>
+                  </div>
+                  <div class="gen-template-body hidden" id="genTplBody">
+                    <div class="param-row">
+                      <label>模板</label>
+                      <select id="genTplSelect">
+                        <option value="">— 选择模板 —</option>
+                      </select>
+                    </div>
+                    <div id="genTplParams"></div>
+                    <button type="button" class="btn btn-small" id="genTplApply" disabled>应用模板 → prompt</button>
+                    <p class="gen-hint" id="genTplHint"></p>
+                  </div>
+                </div>
                 <div class="gen-opts">
                   <div class="param-row">
                     <label>后端</label>

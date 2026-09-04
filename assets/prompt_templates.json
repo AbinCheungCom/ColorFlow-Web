@@ -1,0 +1,207 @@
+{
+  "version": "1.0.0",
+  "updated": "2026-09-04",
+  "categories": [
+    {
+      "id": "luxury",
+      "name": "奢侈品 / 礼品",
+      "icon": "💎"
+    },
+    {
+      "id": "food",
+      "name": "食品 / 饮料",
+      "icon": "🍱"
+    },
+    {
+      "id": "beauty",
+      "name": "美妆 / 个护",
+      "icon": "💄"
+    },
+    {
+      "id": "electronics",
+      "name": "电子产品",
+      "icon": "📱"
+    },
+    {
+      "id": "stationery",
+      "name": "文具 / 印刷品",
+      "icon": "📚"
+    },
+    {
+      "id": "promotional",
+      "name": "促销 / 海报",
+      "icon": "📢"
+    }
+  ],
+  "templates": [
+    {
+      "id": "luxury_gift_box",
+      "name": "高端礼盒",
+      "category": "luxury",
+      "description": "天地盖/书型礼盒，适合品牌礼品/节日礼盒",
+      "prompt": "A {shape} luxury gift box in {color}, {finish} finish with {detail}, placed on {scene} background, studio lighting, professional product photography, 8k resolution, centered composition, no text",
+      "params": {
+        "shape": { "label": "盒型", "default": "rigid tuck-end", "options": ["rigid tuck-end", "book-style", "telescopic", "drawer", "magnetic closure"] },
+        "color": { "label": "主色", "default": "deep burgundy", "options": ["deep burgundy", "navy blue", "matte black", "champagne gold", "cream white", "emerald green", "ivory"] },
+        "finish": { "label": "工艺", "default": "matte lamination", "options": ["matte lamination", "gloss lamination", "soft-touch", "textured emboss", "metallic foil", "spot UV"] },
+        "detail": { "label": "装饰", "default": "gold foil logo", "options": ["gold foil logo", "silver foil stamping", "embossed pattern", "ribbon bow", "custom window", "hand-painted motif"] },
+        "scene": { "label": "背景", "default": "white seamless", "options": ["white seamless", "dark gradient", "marble surface", "natural linen", "wooden tabletop"] }
+      }
+    },
+    {
+      "id": "luxury_watch_box",
+      "name": "腕表 / 珠宝盒",
+      "category": "luxury",
+      "description": "小型展示盒，适合腕表/珠宝/饰品包装",
+      "prompt": "A {color} luxury {product_type} display case, {material} interior lining, {closure} closure, {scene} background, dramatic lighting, jewelry photography, high detail, no text",
+      "params": {
+        "product_type": { "label": "产品类型", "default": "watch", "options": ["watch", "ring", "necklace", "earring", "bracelet"] },
+        "color": { "label": "外色", "default": "black", "options": ["black", "deep blue", "burgundy", "cream", "dark brown"] },
+        "material": { "label": "内衬", "default": "velvet", "options": ["velvet", "suede", "microfiber", "leather"] },
+        "closure": { "label": "开合", "default": "magnetic", "options": ["magnetic", "lid", "flip-top", "drawer", "drawstring"] },
+        "scene": { "label": "背景", "default": "dark studio", "options": ["dark studio", "white marble", "gradient", "black seamless"] }
+      }
+    },
+    {
+      "id": "food_box",
+      "name": "食品包装盒",
+      "category": "food",
+      "description": "彩印盒，适合零食/特产/保健品",
+      "prompt": "A {color} {shape} food packaging box with {pattern}, {finish} finish, printed on {paper}, placed on {scene}, soft natural lighting, appetizing product photography, 8k, no text",
+      "params": {
+        "shape": { "label": "盒型", "default": "rectangular tuck-end", "options": ["rectangular tuck-end", "telescopic", "magnet flap", "foldable mailer", "windowed box"] },
+        "color": { "label": "主色", "default": "natural kraft", "options": ["natural kraft", "warm beige", "bright orange", "fresh green", "deep red", "sky blue"] },
+        "pattern": { "label": "图案", "default": "hand-drawn food illustration", "options": ["hand-drawn food illustration", "minimal geometric", "botanical print", "photo texture", "abstract gradient"] },
+        "finish": { "label": "工艺", "default": "matte", "options": ["matte", "glossy", "soft-touch", "embossed", "spot UV"] },
+        "paper": { "label": "纸张", "default": "food-grade cardboard", "options": ["food-grade cardboard", "kraft paper", "recycled board", "coated art paper"] },
+        "scene": { "label": "背景", "default": "wooden table", "options": ["wooden table", "marble counter", "white seamless", "rattan basket", "linen cloth"] }
+      }
+    },
+    {
+      "id": "beverage_bottle",
+      "name": "饮料 / 酒瓶包装",
+      "category": "food",
+      "description": "瓶装饮品/酒类包装",
+      "prompt": "A {bottle_shape} {color} glass bottle with {label_style} label, {closure_type} cap, {finish} finish, placed on {scene}, backlit rim lighting, beverage product photography, 8k, no text",
+      "params": {
+        "bottle_shape": { "label": "瓶型", "default": "cylindrical", "options": ["cylindrical", "square", "hexagonal", "rounded flask", "tall slim"] },
+        "color": { "label": "瓶身色", "default": "clear", "options": ["clear", "amber", "dark green", "smoky grey", "navy blue"] },
+        "label_style": { "label": "标签风格", "default": "minimalist", "options": ["minimalist", "vintage", "luxury", "eco-friendly", "premium foil"] },
+        "closure_type": { "label": "瓶盖", "default": "metal screw cap", "options": ["metal screw cap", "cork", "swing-top", "flip-top", "foil wrap"] },
+        "finish": { "label": "瓶身工艺", "default": "clear coat", "options": ["clear coat", "frosted", "etched", "textured"] },
+        "scene": { "label": "背景", "default": "dark gradient", "options": ["dark gradient", "white seamless", "marble surface", "wooden bar"] }
+      }
+    },
+    {
+      "id": "cosmetics_jar",
+      "name": "护肤品瓶罐",
+      "category": "beauty",
+      "description": "面霜/精华/乳液瓶罐",
+      "prompt": "A {shape} {color} cosmetic jar with {material} lid, {finish} finish, {label_type} label, placed on {scene}, soft diffused lighting, beauty product photography, 8k, no text",
+      "params": {
+        "shape": { "label": "瓶型", "default": "cylindrical", "options": ["cylindrical", "square", "hexagonal", "teardrop", "petal-shaped"] },
+        "color": { "label": "瓶身色", "default": "frosted white", "options": ["frosted white", "transparent", "gold", "rose gold", "matte black", "pastel pink"] },
+        "material": { "label": "盖子材质", "default": "gold metal", "options": ["gold metal", "silver metal", "matte black plastic", "wooden", "glass"] },
+        "finish": { "label": "工艺", "default": "frosted", "options": ["frosted", "glossy", "matte", "metallic", "iridescent"] },
+        "label_type": { "label": "标签", "default": "minimalist typography", "options": ["minimalist typography", "embossed logo", "foil stamp", "none"] },
+        "scene": { "label": "背景", "default": "white marble", "options": ["white marble", "pastel gradient", "rose petals", "mirror surface", "dark studio"] }
+      }
+    },
+    {
+      "id": "lipstick_case",
+      "name": "口红 / 唇釉",
+      "category": "beauty",
+      "description": "口红/唇釉/睫毛膏包装",
+      "prompt": "A {color} {shape} lipstick case with {accent} accent, {finish} finish, placed on {scene}, dramatic side lighting, beauty product photography, 8k, no text",
+      "params": {
+        "shape": { "label": "外形", "default": "cylindrical", "options": ["cylindrical", "square", "hexagonal", "twist-up", "bullet-shaped"] },
+        "color": { "label": "管身色", "default": "matte black", "options": ["matte black", "gold", "silver", "nude", "pastel pink", "emerald green"] },
+        "accent": { "label": "点缀", "default": "gold band", "options": ["gold band", "silver band", "none", "engraved pattern", "brand logo"] },
+        "finish": { "label": "工艺", "default": "matte", "options": ["matte", "glossy", "metallic", "textured", "iridescent"] },
+        "scene": { "label": "背景", "default": "white seamless", "options": ["white seamless", "dark studio", "marble surface", "gradient"] }
+      }
+    },
+    {
+      "id": "phone_case",
+      "name": "手机壳 / 数码配件",
+      "category": "electronics",
+      "description": "手机壳/平板保护套/耳机盒",
+      "prompt": "A {color} {material} phone case with {pattern}, {finish} finish, placed on {scene}, product photography, 8k, clean composition, no text",
+      "params": {
+        "color": { "label": "主色", "default": "matte black", "options": ["matte black", "white", "navy blue", "sage green", "pastel pink", "transparent"] },
+        "material": { "label": "材质", "default": "silicone", "options": ["silicone", "hard plastic", "leather", "wood", "recycled plastic", "clear TPU"] },
+        "pattern": { "label": "图案", "default": "smooth", "options": ["smooth", "geometric", "marble print", "camera strap cutout", "wallet flap", "rugged bumper"] },
+        "finish": { "label": "工艺", "default": "matte", "options": ["matte", "glossy", "textured", "frosted"] },
+        "scene": { "label": "背景", "default": "white seamless", "options": ["white seamless", "dark studio", "wooden desk", "gradient"] }
+      }
+    },
+    {
+      "id": "earbuds_case",
+      "name": "耳机充电盒",
+      "category": "electronics",
+      "description": "无线耳机/充电盒包装",
+      "prompt": "A {color} {finish} wireless earbuds charging case with {detail}, placed on {scene}, modern product photography, 8k, no text",
+      "params": {
+        "color": { "label": "主色", "default": "white", "options": ["white", "matte black", "silver", "pastel blue", "sage green"] },
+        "finish": { "label": "工艺", "default": "matte plastic", "options": ["matte plastic", "glossy", "frosted", "metallic", "textured"] },
+        "detail": { "label": "细节", "default": "LED indicator light", "options": ["LED indicator light", "USB-C port", "magnetic closure", "transparent window", "engraved logo"] },
+        "scene": { "label": "背景", "default": "white seamless", "options": ["white seamless", "gradient", "marble surface", "dark studio"] }
+      }
+    },
+    {
+      "id": "business_card",
+      "name": "名片",
+      "category": "stationery",
+      "description": "高端名片/邀请函/贺卡",
+      "prompt": "A {color} business card with {technique} technique, {shape} edge, {paper} paper stock, placed on {scene}, top-down view, stationery photography, 8k, no text",
+      "params": {
+        "color": { "label": "底色", "default": "cream", "options": ["cream", "white", "matte black", "navy blue", "burgundy", "kraft"] },
+        "technique": { "label": "工艺", "default": "gold foil stamping", "options": ["gold foil stamping", "letterpress", "emboss", "deboss", "spot UV", "edge gilding"] },
+        "shape": { "label": "边角", "default": "rounded", "options": ["rounded", "square", "chamfered", "die-cut shape"] },
+        "paper": { "label": "纸张", "default": "cotton paper", "options": ["cotton paper", "recycled stock", "silk paper", "kraft paper", "metallic card"] },
+        "scene": { "label": "背景", "default": "dark wood", "options": ["dark wood", "marble surface", "linen cloth", "gradient"] }
+      }
+    },
+    {
+      "id": "book_cover",
+      "name": "书籍 / 画册封面",
+      "category": "stationery",
+      "description": "书籍/画册/杂志封面",
+      "prompt": "A {color} {material} book cover with {technique}, {scene} on the cover, placed on {surface}, soft natural lighting, book photography, 8k, no text",
+      "params": {
+        "color": { "label": "封面色", "default": "deep blue", "options": ["deep blue", "matte black", "cream", "burgundy", "forest green", "warm beige"] },
+        "material": { "label": "材质", "default": "cloth-bound", "options": ["cloth-bound", "leather", "matte board", "textured paper", "metallic foil"] },
+        "technique": { "label": "工艺", "default": "gold foil title", "options": ["gold foil title", "embossed title", "letterpress", "spot UV pattern", "none"] },
+        "scene": { "label": "封面图案", "default": "abstract geometric", "options": ["abstract geometric", "landscape illustration", "portrait silhouette", "minimalist icon", "photograph"] },
+        "surface": { "label": "放置面", "default": "wooden table", "options": ["wooden table", "marble surface", "linen cloth", "glass table"] }
+      }
+    },
+    {
+      "id": "promo_poster",
+      "name": "促销海报",
+      "category": "promotional",
+      "description": "促销海报/宣传单/易拉宝",
+      "prompt": "A {color_scheme} promotional poster with {style} style, featuring {subject}, bold typography, {scene} background, professional graphic design, 8k, no text",
+      "params": {
+        "color_scheme": { "label": "配色", "default": "vibrant red and yellow", "options": ["vibrant red and yellow", "blue and white", "black and gold", "green and white", "pastel rainbow"] },
+        "style": { "label": "风格", "default": "bold modern", "options": ["bold modern", "minimalist", "retro vintage", "luxury elegant", "eco-friendly"] },
+        "subject": { "label": "主题", "default": "holiday sale", "options": ["holiday sale", "new product launch", "clearance event", "anniversary celebration", "flash deal"] },
+        "scene": { "label": "背景", "default": "gradient burst", "options": ["gradient burst", "photographic scene", "geometric shapes", "minimal white", "textured"] }
+      }
+    },
+    {
+      "id": "product_brochure",
+      "name": "产品画册",
+      "category": "promotional",
+      "description": "产品宣传册/目录/手册",
+      "prompt": "A {color} {style} product brochure with {technique}, showing {subject}, placed on {surface}, professional product photography, 8k, no text",
+      "params": {
+        "color": { "label": "主色", "default": "clean white", "options": ["clean white", "light grey", "cream", "navy blue", "dark green"] },
+        "style": { "label": "风格", "default": "corporate minimal", "options": ["corporate minimal", "luxury editorial", "eco-friendly organic", "tech futuristic", "creative artistic"] },
+        "technique": { "label": "工艺", "default": "matte lamination", "options": ["matte lamination", "gloss lamination", "spot UV", "emboss", "soft-touch"] },
+        "subject": { "label": "内容", "default": "product lineup", "options": ["product lineup", "brand story", "company profile", "service portfolio"] },
+        "surface": { "label": "放置面", "default": "marble table", "options": ["marble table", "wooden desk", "linen cloth", "glass surface"] }
+      }
+    }
+  ]
+}

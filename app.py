@@ -1391,6 +1391,85 @@ def generate_prompt_api():
         return jsonify({"error": f"图→prompt 失败: {e}"}), 500
 
 
+# ============================================================
+# Prompt 模板库（Phase 4 · 行业预制 prompt → GEN）
+# ============================================================
+#
+# 模板文件 assets/prompt_templates.json 按 category 分组，每个模板含
+# {placeholder} 占位符和 params 定义。前端下拉选模板 → 填参数 → 渲染 →
+# 回填 GEN 提示词框 → 生图。对应 docs/03 P2「Prompt 模板库」。
+#
+# 渲染逻辑在 prompt_templates.py（纯 CPU 字符串替换，零延迟，零网络）。
+
+@app.route("/api/prompt-templates", methods=["GET"])
+def prompt_templates_list():
+    """列出所有模板（按 category 分组），支持 search 过滤。
+
+    Query:
+        category: 按分类过滤（luxury / food / beauty / electronics / stationery / promotional）
+        search:   模糊搜索模板名/描述
+    """
+    from prompt_templates import list_categories, list_templates
+    category = request.args.get("category", "").strip() or None
+    search = request.args.get("search", "").strip() or None
+    try:
+        cats = list_categories()
+        tpls = list_templates(category=category, search=search)
+        return jsonify({"success": True, "categories": cats, "templates": tpls,
+                        "count": len(tpls)})
+    except Exception as e:
+        logger.exception("prompt_templates_list 失败")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/prompt-templates/<template_id>", methods=["GET"])
+def prompt_template_detail(template_id):
+    """获取单个模板完整定义（含 prompt 原文和 params 定义）"""
+    from prompt_templates import get_template, TemplateError
+    try:
+        t = get_template(template_id)
+        return jsonify({"success": True, "template": t})
+    except TemplateError as e:
+        status = 404 if e.code == "not_found" else 500
+        return jsonify({"error": str(e), "code": e.code}), status
+    except Exception as e:
+        logger.exception("prompt_template_detail 失败")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/prompt-templates/render", methods=["POST"])
+def prompt_template_render():
+    """渲染模板 → 完整 prompt。
+
+    Form/JSON:
+        template_id: 模板 id（必填）
+        params:     {param_name: value}（可选，缺失用默认值）
+    """
+    from prompt_templates import render as tpl_render, TemplateError
+    # 支持 JSON 和 form 两种提交方式
+    if request.is_json:
+        template_id = (request.json.get("template_id", "") or "").strip()
+        params = request.json.get("params", {}) or {}
+    else:
+        template_id = (request.form.get("template_id", "") or "").strip()
+        params = {}
+        for k, v in request.form.items():
+            if k.startswith("param_"):
+                params[k[6:]] = v
+
+    if not template_id:
+        return jsonify({"error": "template_id 不能为空"}), 400
+    try:
+        result = tpl_render(template_id, params)
+        return jsonify({"success": True, **result})
+    except TemplateError as e:
+        status = 404 if e.code == "not_found" else 400
+        return jsonify({"error": str(e), "code": e.code}), status
+    except Exception as e:
+        logger.exception("prompt_template_render 失败")
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     app.run(
         host="0.0.0.0",

@@ -32,6 +32,7 @@ hiddenimports = [
     # 项目自研模块（本地模块需显式声明，防 PyInstaller 静态分析遗漏）
     "gen_backends",
     "vision_backends",
+    "prompt_templates",
     "services", "services.color_delta_e", "services.color_pdf",
     "colorflow_keys",
     "colorflow_sdk", "colorflow_sdk.exceptions",

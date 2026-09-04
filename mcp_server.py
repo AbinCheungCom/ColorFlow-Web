@@ -882,6 +882,80 @@ def image_to_prompt(
 
 
 # ============================================================
+# Prompt 模板库（Phase 4 · 行业预制 prompt → GEN）
+# ============================================================
+#
+# 模板文件 assets/prompt_templates.json，按 category 分组，每个模板含
+# {placeholder} 占位符和 params 定义。Agent 可列出模板 → 选模板 → 填参数
+# → 渲染 prompt → 传给 generate_image / full_pipeline。
+# 渲染逻辑在 prompt_templates.py（纯 CPU，零延迟，零网络）。
+
+
+@mcp.tool()
+def prompt_templates(category: str = "", search: str = "") -> str:
+    """列出行业预制 prompt 模板（按分类分组）。
+
+    用法：先调用本工具获取模板清单，再用 prompt_render 渲染具体模板。
+
+    Args:
+        category: 按分类过滤（luxury / food / beauty / electronics / stationery / promotional）
+        search: 模糊搜索模板名/描述
+    Returns:
+        JSON: {success, categories, templates, count}
+        templates: [{id, name, category, description, param_names}]
+    """
+    auth = _auth_check()
+    if auth:
+        return auth
+    from prompt_templates import list_categories, list_templates, TemplateError
+    try:
+        cats = list_categories()
+        tpls = list_templates(category=category or None, search=search or None)
+        return json.dumps({
+            "success": True, "categories": cats, "templates": tpls,
+            "count": len(tpls),
+        }, ensure_ascii=False)
+    except TemplateError as e:
+        return json.dumps({"error": str(e), "code": e.code}, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": f"模板列表查询失败: {e}"}, ensure_ascii=False)
+
+
+@mcp.tool()
+def prompt_render(template_id: str, params: str = "") -> str:
+    """渲染 prompt 模板 → 完整英文 prompt。
+
+    用法：先调用 prompt_templates 获取模板清单，再用本工具渲染。
+    渲染结果可直接传给 generate_image 或 full_pipeline。
+
+    Args:
+        template_id: 模板 id（如 luxury_gift_box）
+        params: JSON 字符串 {param_name: value}（可选，缺失用模板默认值）
+    Returns:
+        JSON: {success, prompt, template_id, template_name, params: {name: {value, default}}}
+    """
+    auth = _auth_check()
+    if auth:
+        return auth
+    from prompt_templates import render as tpl_render, TemplateError
+    if not template_id or not template_id.strip():
+        return json.dumps({"error": "template_id 不能为空"}, ensure_ascii=False)
+    parsed_params = {}
+    if params:
+        try:
+            parsed_params = json.loads(params)
+        except json.JSONDecodeError as e:
+            return json.dumps({"error": f"params 不是合法 JSON: {e}"}, ensure_ascii=False)
+    try:
+        result = tpl_render(template_id, parsed_params)
+        return json.dumps({"success": True, **result}, ensure_ascii=False)
+    except TemplateError as e:
+        return json.dumps({"error": str(e), "code": e.code}, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": f"模板渲染失败: {e}"}, ensure_ascii=False)
+
+
+# ============================================================
 # 一句话流水线（Phase 2）：生图 → 抠图 → 描图 → Pantone → 报价 → ZIP
 # ============================================================
 
