@@ -707,6 +707,15 @@ body {
   width: auto;
 }
 
+/* 按钮 / 标签 / 提示内的 SVG 图标（替代 emoji，随 currentColor 变色） */
+.btn-ico { width: 15px; height: 15px; flex-shrink: 0; }
+.btn-small .btn-ico { width: 13px; height: 13px; }
+.lbl-ico { width: 14px; height: 14px; vertical-align: -2.5px; margin-right: 5px; flex-shrink: 0; }
+.hint-ico { width: 12px; height: 12px; vertical-align: -1.5px; margin-right: 4px; flex-shrink: 0; }
+.dot-ico { width: 13px; height: 13px; flex-shrink: 0; }
+.dot-ico.ok { color: var(--success, #1f9d55); }
+.dot-ico.no { color: var(--error, #d64545); }
+
 .btn-loader { font-size: 14px; }
 
 /* accent = pastel color block (brand story moment) */

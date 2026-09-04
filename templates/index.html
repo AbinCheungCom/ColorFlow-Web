@@ -225,7 +225,7 @@
                   <div class="key-empty">加载中...</div>
                 </div>
                 <div class="settings-action-row">
-                  <button class="btn btn-primary btn-small" data-open-settings="llm">🔑 去配置大模型 API Key →</button>
+                  <button class="btn btn-primary btn-small" data-open-settings="llm"><svg class="btn-ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="5.4" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8.3 8h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.4 8v2.1M13.3 8v1.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span class="btn-text">去配置大模型 API Key →</span></button>
                 </div>
               </div>
               <div class="settings-section">
@@ -672,13 +672,13 @@
                   <label id="genPromptLabel">生图描述</label>
                   <div class="gen-prompt-area">
                     <textarea id="genPrompt" class="gen-prompt-input" rows="3" placeholder="红色天地盖礼盒，烫金logo，哑光材质，电商白底"></textarea>
-                    <button type="button" class="btn btn-small btn-secondary gen-optimize-btn" id="genOptimizeBtn">✨ 优化</button>
+                    <button type="button" class="btn btn-small btn-secondary gen-optimize-btn" id="genOptimizeBtn"><svg class="btn-ico" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M6 6.4 7.2 8.8 9.6 10 7.2 11.2 6 13.6 4.8 11.2 2.4 10 4.8 8.8z"/><path fill="currentColor" d="M12.5 1.8 13.25 3.25 14.7 4 13.25 4.75 12.5 6.2 11.75 4.75 10.3 4 11.75 3.25z"/></svg><span class="btn-text">优化</span></button>
                   </div>
                   <p class="gen-hint" id="genPromptHint"></p>
                 </div>
                 <div class="gen-template-section">
                   <div class="gen-template-header">
-                    <label>🎨 行业模板</label>
+                    <label><svg class="lbl-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.6a5.4 5.4 0 1 0 .38 10.79c1.05.1 1.5-.55 1.22-1.43-.35-1.1.28-1.85 1.37-1.95 1.55-.14 2.75-1.15 2.75-3.01A5.4 5.4 0 0 0 8 2.6z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="5.4" cy="6.3" r=".9" fill="currentColor"/><circle cx="8.2" cy="5" r=".9" fill="currentColor"/><circle cx="10.9" cy="6.3" r=".9" fill="currentColor"/></svg>行业模板</label>
                     <div class="gen-tpl-actions">
                       <button type="button" class="btn btn-small btn-secondary" id="genTplToggle">展开</button>
                       <button type="button" class="btn btn-small btn-secondary" id="genTplCustomBtn" title="创建自定义模板">+ 自定义</button>
@@ -751,17 +751,19 @@
                     <img id="genReversePreviewImg" class="preview-img hidden" />
                   </div>
                   <button class="btn btn-secondary btn-small" id="genReverseBtn" disabled>
-                    <span class="btn-text">🔍 提取 prompt</span>
+                    <svg class="btn-ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2 13.6 13.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                    <span class="btn-text">提取 prompt</span>
                     <span class="btn-loader hidden">提取中...</span>
                   </button>
                   <button class="btn btn-secondary btn-small" id="genSaveRefBtn" disabled>
-                    <span class="btn-text">💾 保存到图库</span>
+                    <svg class="btn-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.2 2.8h7.4l2.2 2.2v8.2a.4.4 0 0 1-.4.4H3.2a.4.4 0 0 1-.4-.4V3.2a.4.4 0 0 1 .4-.4z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.4 2.8v3.4h4.6V2.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.2 13V8.8h5.6V13" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+                    <span class="btn-text">保存到图库</span>
                   </button>
                 </div>
                 <!-- 参考图库 -->
                 <div class="gen-ref-gallery" id="genRefGallery">
                   <div class="gen-ref-gallery-header">
-                    <label>📷 参考图库</label>
+                    <label><svg class="lbl-ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.6" y="3.4" width="10.8" height="9.2" rx="1.1" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="5.9" cy="6.7" r="1.1" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M2.6 11.2 5.8 8l2.3 2.2 2.3-2.4 3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>参考图库</label>
                     <button type="button" class="btn btn-small btn-secondary" id="genRefGalleryClear">清空</button>
                   </div>
                   <div class="gen-ref-gallery-items" id="genRefGalleryItems">
@@ -769,7 +771,8 @@
                   </div>
                 </div>
                 <button class="btn btn-primary" id="genBtn" disabled>
-                  <span class="btn-text">✨ 生成效果图</span>
+                  <svg class="btn-ico" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M6 6.4 7.2 8.8 9.6 10 7.2 11.2 6 13.6 4.8 11.2 2.4 10 4.8 8.8z"/><path fill="currentColor" d="M12.5 1.8 13.25 3.25 14.7 4 13.25 4.75 12.5 6.2 11.75 4.75 10.3 4 11.75 3.25z"/></svg>
+                  <span class="btn-text">生成效果图</span>
                   <span class="btn-loader hidden">生成中...</span>
                 </button>
                 <p class="gen-hint" id="genHint">生成图为灵感稿，印刷请走右侧生产链路</p>

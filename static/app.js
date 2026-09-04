@@ -5,6 +5,41 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// === GEN 页 SVG 图标（替代 emoji，16×16 / currentColor）===
+// 用法：genIco('sparkles') 默认 hint-ico；genIco('key', 'btn-ico') 指定类名
+const GEN_ICON_PATHS = {
+  // 星芒（✨）
+  sparkles: '<path fill="currentColor" d="M6 6.4 7.2 8.8 9.6 10 7.2 11.2 6 13.6 4.8 11.2 2.4 10 4.8 8.8z"/><path fill="currentColor" d="M12.5 1.8 13.25 3.25 14.7 4 13.25 4.75 12.5 6.2 11.75 4.75 10.3 4 11.75 3.25z"/>',
+  // 调色盘（🎨）
+  palette: '<path d="M8 2.6a5.4 5.4 0 1 0 .38 10.79c1.05.1 1.5-.55 1.22-1.43-.35-1.1.28-1.85 1.37-1.95 1.55-.14 2.75-1.15 2.75-3.01A5.4 5.4 0 0 0 8 2.6z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="5.4" cy="6.3" r=".9" fill="currentColor"/><circle cx="8.2" cy="5" r=".9" fill="currentColor"/><circle cx="10.9" cy="6.3" r=".9" fill="currentColor"/>',
+  // 放大镜（🔍）
+  search: '<circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10.2 10.2 13.6 13.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+  // 软盘（💾）
+  save: '<path d="M3.2 2.8h7.4l2.2 2.2v8.2a.4.4 0 0 1-.4.4H3.2a.4.4 0 0 1-.4-.4V3.2a.4.4 0 0 1 .4-.4z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.4 2.8v3.4h4.6V2.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.2 13V8.8h5.6V13" fill="none" stroke="currentColor" stroke-width="1.3"/>',
+  // 图库（📷）
+  image: '<rect x="2.6" y="3.4" width="10.8" height="9.2" rx="1.1" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="5.9" cy="6.7" r="1.1" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M2.6 11.2 5.8 8l2.3 2.2 2.3-2.4 3 3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
+  // 钥匙（🔑）
+  key: '<circle cx="5.4" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8.3 8h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11.4 8v2.1M13.3 8v1.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+  // 循环（🔁）
+  refresh: '<path d="M12.9 5.6A5 5 0 1 0 13.4 9.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M13.2 2.6v3.1h-3.1" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+  // 警告（⚠️）
+  warning: '<path d="M8 2.6 14.4 13.2H1.6z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 6.6v3.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="11.6" r=".55" fill="currentColor"/>',
+  // 对勾（✅）
+  check: '<path d="M3.5 8.6 6.4 11.5 12.5 4.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+  // 叉（❌）
+  close: '<path d="M4.2 4.2 11.8 11.8M11.8 4.2 4.2 11.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  // 包裹（📦）
+  box: '<path d="M8 2.2 13.6 5v6L8 13.8 2.4 11V5z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M2.4 5 8 7.8 13.6 5M8 7.8v6" fill="none" stroke="currentColor" stroke-width="1.2"/>',
+  // 文档（📝）
+  memo: '<rect x="3.4" y="2.4" width="9.2" height="11.2" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M5.4 5.8h5.2M5.4 8h5.2M5.4 10.2h3.2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+  // 时钟（⏰）
+  clock: '<circle cx="8" cy="8" r="5.4" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 5v3.2l2.2 1.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+};
+function genIco(name, cls) {
+  const p = GEN_ICON_PATHS[name];
+  return p ? `<svg class="${cls || 'hint-ico'}" viewBox="0 0 16 16" aria-hidden="true">${p}</svg>` : '';
+}
+
 // ΔE 分级（Figma match-de 配色）
 function gradeClass(de) {
   return de < 1 ? 'excellent' : de < 3 ? 'good' : de < 6 ? 'fair' : 'poor';
@@ -1168,7 +1203,9 @@ if (genReverseBtn) {
         genPrompt.value = data.prompt;
         genBtn.disabled = false;
       }
-      genHint.textContent = '🔁 prompt 已由图像自动提取（' + (data.backend || '-') + ' · ' + (data.elapsed_ms || 0) + 'ms），可直接生成或微调后再生成';
+      genHint.innerHTML = genIco('refresh') + 'prompt 已由图像自动提取（'
+        + escapeHtml(data.backend || '-') + ' · ' + (data.elapsed_ms || 0)
+        + 'ms），可直接生成或微调后再生成';
     } catch (e) {
       alert('提取 prompt 失败：' + fetchErrorMessage(e));
     } finally {
@@ -1193,10 +1230,11 @@ async function loadGenBackends() {
         list.innerHTML = '<div class="key-empty">加载失败</div>';
       } else if (!avail.length) {
         list.innerHTML = '<div class="key-empty">未配置任何生图后端 Key<br/>'
-          + '<button class="btn btn-primary btn-small" data-open-settings="llm">🔑 去配置大模型 API Key →</button></div>';
+          + `<button class="btn btn-primary btn-small" data-open-settings="llm">`
+          + genIco('key', 'btn-ico') + '<span class="btn-text">去配置大模型 API Key →</span></button></div>';
       } else {
         list.innerHTML = backends.map(b => {
-          const dot = b.available ? '✅' : '❌';
+          const dot = genIco(b.available ? 'check' : 'close', 'dot-ico ' + (b.available ? 'ok' : 'no'));
           const model = b.model ? `<span class="gen-backend-model">${escapeHtml(b.model)}</span>` : '';
           return `<div class="gen-backend-row"><span class="gen-backend-dot">${dot}</span>
             <span class="gen-backend-label">${escapeHtml(b.label)}</span>${model}</div>`;
@@ -1230,8 +1268,9 @@ async function loadGenBackends() {
           '　·　<a class="gen-link" data-open-settings="llm">切换模型 / 换后端 →</a>';
         needCfg.classList.remove('gen-warn');
       } else {
-        needCfg.innerHTML = '⚠️ 尚未配置任何生图后端 Key，无法生成<br>' +
-          '<button class="btn btn-small btn-primary" data-open-settings="llm">🔑 去配置大模型 API Key →</button>';
+        needCfg.innerHTML = `${genIco('warning')}尚未配置任何生图后端 Key，无法生成<br>` +
+          `<button class="btn btn-small btn-primary" data-open-settings="llm">`
+          + genIco('key', 'btn-ico') + '<span class="btn-text">去配置大模型 API Key →</span></button>';
         needCfg.classList.add('gen-warn');
       }
     }
@@ -1576,7 +1615,7 @@ function renderTplSelect(cats) {
   cats.forEach(cat => {
     const tpls = _genTplData.filter(t => t.category === cat.id);
     if (tpls.length === 0) return;
-    html += `<optgroup label="${cat.icon} ${cat.name}">`;
+    html += `<optgroup label="${escapeHtml(cat.name).replace(/"/g, '&quot;')}">`;
     tpls.forEach(t => {
       html += `<option value="${t.id}">${t.name}</option>`;
     });
@@ -1585,7 +1624,7 @@ function renderTplSelect(cats) {
   // 自定义模板
   const custom = _genTplData.filter(t => t.category === 'custom');
   if (custom.length > 0) {
-    html += '<optgroup label="⭐ 自定义模板">';
+    html += '<optgroup label="自定义模板">';
     custom.forEach(t => {
       html += `<option value="${t.id}">${t.name}</option>`;
     });
@@ -1652,7 +1691,7 @@ function updateTplPreview(template) {
     prompt = prompt.replace('{' + sel.dataset.param + '}', val);
   });
   const preview = document.getElementById('genTplPreview');
-  if (preview) preview.textContent = '📝 ' + prompt;
+  if (preview) preview.innerHTML = genIco('memo') + escapeHtml(prompt);
   genTplHint.textContent = '点击「应用模板」回填到上方 prompt 框';
 }
 
@@ -1687,7 +1726,7 @@ if (genTplApply) {
         genPrompt.value = resultPrompt;
         genBtn.disabled = false;
       }
-      genHint.textContent = '🎨 prompt 已由模板「' + sel.name + '」生成，可直接生成或微调后再生成';
+      genHint.innerHTML = genIco('palette') + 'prompt 已由模板「' + escapeHtml(sel.name) + '」生成，可直接生成或微调后再生成';
     } catch (e) {
       genTplHint.textContent = '渲染失败：' + fetchErrorMessage(e);
     }
@@ -1737,7 +1776,7 @@ if (genOptimizeBtn) {
     const prompt = genPrompt.value.trim();
     if (!prompt) { genPromptHint.textContent = '请先输入 prompt'; return; }
     genOptimizeBtn.disabled = true;
-    genPromptHint.textContent = '✨ 优化中…';
+    genPromptHint.innerHTML = genIco('sparkles') + '优化中…';
     try {
       const resp = await apiFetch('/api/prompt/optimize', {
         method: 'POST',
@@ -1747,18 +1786,18 @@ if (genOptimizeBtn) {
       const data = await resp.json();
       if (data.success) {
         genPrompt.value = data.prompt;
-        genPromptHint.textContent = `✅ 已优化（${data.backend}）`;
+        genPromptHint.innerHTML = genIco('check') + '已优化（' + escapeHtml(data.backend || '-') + '）';
         genPromptHint.style.color = 'var(--success)';
       } else {
-        genPromptHint.textContent = '❌ ' + (data.error || '优化失败');
+        genPromptHint.innerHTML = genIco('close') + escapeHtml(data.error || '优化失败');
         genPromptHint.style.color = 'var(--error)';
       }
     } catch (e) {
-      genPromptHint.textContent = '❌ ' + fetchErrorMessage(e);
+      genPromptHint.innerHTML = genIco('close') + escapeHtml(fetchErrorMessage(e));
       genPromptHint.style.color = 'var(--error)';
     }
     genOptimizeBtn.disabled = false;
-    setTimeout(() => { genPromptHint.textContent = ''; }, 4000);
+    setTimeout(() => { genPromptHint.innerHTML = ''; }, 4000);
   });
 }
 
@@ -1774,8 +1813,8 @@ if (genBtn) {
     if (_genMode === 'batch') {
       // 批量模式
       const prompts = promptText.split('\n').map(s => s.trim()).filter(Boolean);
-      if (prompts.length === 0) { genBtn.disabled = false; genBtn.querySelector('.btn-text').textContent = '✨ 生成效果图'; return; }
-      genPromptHint.textContent = `📦 批量模式：${prompts.length} 个 prompt`;
+      if (prompts.length === 0) { genBtn.disabled = false; genBtn.querySelector('.btn-text').textContent = '生成效果图'; return; }
+      genPromptHint.innerHTML = genIco('box') + '批量模式：' + prompts.length + ' 个 prompt';
       try {
         const formData = new FormData();
         prompts.forEach((p, i) => formData.append('prompts', p));
@@ -1788,14 +1827,14 @@ if (genBtn) {
         if (data.success) {
           await pollBatchJob(data.batch_id, prompts);
         } else {
-          genPromptHint.textContent = '❌ ' + (data.error || '提交失败');
+          genPromptHint.innerHTML = genIco('close') + escapeHtml(data.error || '提交失败');
         }
       } catch (e) {
-        genPromptHint.textContent = '❌ ' + fetchErrorMessage(e);
+        genPromptHint.innerHTML = genIco('close') + escapeHtml(fetchErrorMessage(e));
       }
     } else {
       // 单张模式（原有逻辑）
-      genPromptHint.textContent = '✨ 生成中…';
+      genPromptHint.innerHTML = genIco('sparkles') + '生成中…';
       try {
         const formData = new FormData();
         formData.append('prompt', promptText);
@@ -1808,14 +1847,14 @@ if (genBtn) {
         if (data.success) {
           await genPollJob(data.job_id);
         } else {
-          genPromptHint.textContent = '❌ ' + (data.error || '提交失败');
+          genPromptHint.innerHTML = genIco('close') + escapeHtml(data.error || '提交失败');
         }
       } catch (e) {
-        genPromptHint.textContent = '❌ ' + fetchErrorMessage(e);
+        genPromptHint.innerHTML = genIco('close') + escapeHtml(fetchErrorMessage(e));
       }
     }
     genBtn.disabled = false;
-    genBtn.querySelector('.btn-text').textContent = '✨ 生成效果图';
+    genBtn.querySelector('.btn-text').textContent = '生成效果图';
   };
 }
 
@@ -1831,13 +1870,13 @@ async function pollBatchJob(batchId, prompts) {
         return;
       }
       if (job.status === 'failed') {
-        genPromptHint.textContent = '❌ ' + (job.error || '批量失败');
+        genPromptHint.innerHTML = genIco('close') + escapeHtml(job.error || '批量失败');
         return;
       }
       genPromptHint.textContent = job.progress || '批量处理中…';
     } catch (e) { /* 继续轮询 */ }
   }
-  genPromptHint.textContent = '⏰ 批量超时，请重试';
+  genPromptHint.innerHTML = genIco('clock') + '批量超时，请重试';
 }
 
 function renderBatchResults(job) {
@@ -1845,7 +1884,7 @@ function renderBatchResults(job) {
   if (!results) return;
   const images = job.images || [];
   const errors = job.errors || [];
-  let html = `<div class="gen-batch-summary">📦 ${job.prompt_count} 个 prompt → ${images.length} 张图` +
+  let html = `<div class="gen-batch-summary">${genIco('box', 'hint-ico')} ${job.prompt_count} 个 prompt → ${images.length} 张图` +
     (errors.length ? ` · ${errors.length} 个失败` : '') + ` · ${(job.elapsed_ms / 1000).toFixed(1)}s</div>`;
   html += '<div class="gen-grid">';
   images.forEach((img, idx) => {
@@ -1863,7 +1902,7 @@ function renderBatchResults(job) {
   if (errors.length) {
     html += '<div class="gen-batch-errors">';
     errors.forEach(e => {
-      html += `<div class="gen-batch-error-item">❌ ${escapeHtml((e.prompt || '').slice(0, 40))}: ${escapeHtml(e.error || '')}</div>`;
+      html += `<div class="gen-batch-error-item">${genIco('close', 'hint-ico')} ${escapeHtml((e.prompt || '').slice(0, 40))}: ${escapeHtml(e.error || '')}</div>`;
     });
     html += '</div>';
   }
@@ -1944,7 +1983,7 @@ if (genSaveRefBtn) {
       gallery.push({ name: file.name, dataUrl: e.target.result, size: file.size });
       localStorage.setItem(REF_GALLERY_KEY, JSON.stringify(gallery));
       loadRefGallery();
-      genPromptHint.textContent = `💾 已保存到图库（${gallery.length} 张）`;
+      genPromptHint.innerHTML = genIco('save') + '已保存到图库（' + gallery.length + ' 张）';
       genPromptHint.style.color = 'var(--success)';
       setTimeout(() => { genPromptHint.textContent = ''; }, 2500);
     };
@@ -2009,7 +2048,7 @@ if (genTplCustomBtn) {
     saveCustomTemplates(tpls);
     _genTplData = mergeAllTemplates();
     renderTplSelect();
-    genPromptHint.textContent = `✅ 已创建自定义模板「${name}」`;
+    genPromptHint.innerHTML = genIco('check') + '已创建自定义模板「' + escapeHtml(name) + '」';
     genPromptHint.style.color = 'var(--success)';
     setTimeout(() => { genPromptHint.textContent = ''; }, 2500);
   });
@@ -2051,10 +2090,10 @@ if (genTplImportFile) {
         saveCustomTemplates(merged);
         _genTplData = mergeAllTemplates();
         renderTplSelect();
-        genPromptHint.textContent = `✅ 已导入 ${imported.length} 个模板`;
+        genPromptHint.innerHTML = genIco('check') + '已导入 ' + imported.length + ' 个模板';
         genPromptHint.style.color = 'var(--success)';
       } catch (err) {
-        genPromptHint.textContent = '❌ 导入失败：' + err.message;
+        genPromptHint.innerHTML = genIco('close') + '导入失败：' + escapeHtml(err.message);
         genPromptHint.style.color = 'var(--error)';
       }
       setTimeout(() => { genPromptHint.textContent = ''; }, 3000);
