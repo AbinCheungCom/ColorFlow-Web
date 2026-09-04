@@ -264,8 +264,7 @@ function switchSettingsPage(nav) {
   // 按需刷新目标页数据
   if (nav === 'apikey') loadKeyList();
   if (nav === 'mcp') updateMcpConfig();
-  if (nav === 'gen') loadGenBackends();
-  if (nav === 'llm') loadLLMKeys();
+  if (nav === 'llm') { loadGenBackends(); loadLLMKeys(); }
 }
 
 document.querySelectorAll('.settings-nav-item').forEach(item => {
@@ -1233,9 +1232,7 @@ async function loadGenBackends() {
       if (!data.success) {
         list.innerHTML = '<div class="key-empty">加载失败</div>';
       } else if (!avail.length) {
-        list.innerHTML = '<div class="key-empty">未配置任何生图后端 Key<br/>'
-          + `<button class="btn btn-primary btn-small" data-open-settings="llm">`
-          + genIco('key', 'btn-ico') + '<span class="btn-text">去配置大模型 API Key →</span></button></div>';
+        list.innerHTML = '<div class="key-empty">未配置任何生图后端 Key · 请在下方配置</div>';
       } else {
         list.innerHTML = backends.map(b => {
           const dot = genIco(b.available ? 'check' : 'close', 'dot-ico ' + (b.available ? 'ok' : 'no'));
