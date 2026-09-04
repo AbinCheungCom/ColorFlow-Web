@@ -68,6 +68,42 @@ def handle_preflight():
 # Initialize SDK
 sdk = ColorFlowSDK(output_dir="/tmp/colorflow-output")
 
+_START_TIME = time.time()  # 进程启动时间戳（供 /healthz 上报 uptime）
+
+
+@app.route("/healthz", methods=["GET"])
+def healthz():
+    """轻量健康检查：返回 200 表示进程存活。
+
+    不触发 SDK/抠图模型加载（避免探针拖慢冷启动），仅检查进程级依赖导入。
+    Docker HEALTHCHECK / K8s livenessProbe / readinessProbe 可直接使用。
+    该端点不经 /api/* 鉴权，供负载均衡 / 容器编排探针访问。
+    """
+    checks = {}
+    try:
+        import colorflow_sdk  # noqa: F401
+        checks["colorflow_sdk"] = True
+    except Exception as e:
+        checks["colorflow_sdk"] = str(e)
+    try:
+        import rembg  # noqa: F401
+        checks["rembg"] = True
+    except Exception as e:
+        checks["rembg"] = str(e)
+    try:
+        import reportlab  # noqa: F401
+        checks["reportlab"] = True
+    except Exception as e:
+        checks["reportlab"] = str(e)
+    checks["gen_backends"] = available_backends()
+    checks["vision_backends"] = vision_available_backends()
+    return jsonify({
+        "status": "ok",
+        "pid": os.getpid(),
+        "uptime_s": round(time.time() - _START_TIME, 1),
+        "checks": checks,
+    })
+
 
 # 允许的图片类型
 ALLOWED_CONTENT_TYPES = {"image/png", "image/jpeg", "image/webp", "image/bmp"}

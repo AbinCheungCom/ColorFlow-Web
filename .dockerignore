@@ -1,0 +1,66 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+.venv/
+
+# IDE / 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 测试
+.pytest_cache/
+.coverage
+htmlcov/
+tests/__pycache__/
+
+# 产物 / 临时文件
+*.zip
+*.log
+*.tmp
+*.bak
+nohup.out
+
+# 上传/输出目录（运行时生成）
+/tmp/
+colorflow-uploads/
+colorflow-output/
+
+# 桌面打包
+colorflow_desktop_app.spec
+requirements-desktop.txt
+*.ico
+make_icon.py
+
+# 大文件 / 模型（模型由 Dockerfile 显式 COPY 或运行时下载）
+# 注意：models/silueta.onnx 若体积较大，可注释下行并从 GitHub Release 拉取
+# models/*.onnx
+
+# 文档（镜像内不需要，减小体积）
+docs/
+doc/
+
+# 实验/调试文件
+test_rembg.py
+test_cutout_debug.py
+test_cutout_api.py
+colorflow.ico
+
+# macOS
+.DS_Store

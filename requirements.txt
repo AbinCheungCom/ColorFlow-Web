@@ -7,3 +7,5 @@ rembg[cpu]>=2.0.0
 # 印刷 PDF 导出（export_print 需要 reportlab + svglib 渲染 SVG→PDF）
 svglib>=1.5.0
 reportlab>=4.0.0
+# 生产 WSGI 服务器（Windows/Linux 通用，gunicorn 仅 Linux/macOS）
+waitress>=3.0.0

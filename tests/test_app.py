@@ -32,6 +32,38 @@ class TestIndex:
         assert resp.status_code == 200
         assert b"ColorFlow" in resp.data
 
+    def test_healthz(self):
+        """健康检查端点（供 Docker/K8s/LB 探针使用，不经 /api/* 鉴权）"""
+        resp = client.get("/healthz")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["status"] == "ok"
+        assert data["pid"] > 0
+        assert data["uptime_s"] >= 0
+        assert "checks" in data
+
+    def test_healthz_check_keys(self):
+        """健康检查报告各模块导入状态"""
+        data = client.get("/healthz").get_json()
+        checks = data["checks"]
+        # 核心模块应可导入
+        assert checks.get("colorflow_sdk") is True
+        assert checks.get("rembg") is True
+        assert checks.get("reportlab") is True
+        # 后端可用性应为列表
+        assert isinstance(checks.get("gen_backends"), list)
+        assert isinstance(checks.get("vision_backends"), list)
+        # vision mock 始终可用
+        assert "mock" in checks["vision_backends"]
+
+    def test_healthz_unauthenticated(self, monkeypatch):
+        """配置了 API Key 时 /healthz 仍公开（探针不应被拦截）"""
+        # 模拟 keystore 已有 key 的场景
+        monkeypatch.setattr(keystore, "has_any", lambda: True)
+        resp = client.get("/healthz")
+        assert resp.status_code == 200
+        assert resp.get_json()["status"] == "ok"
+
 
 class TestTrace:
     def test_no_image(self):

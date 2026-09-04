@@ -112,12 +112,100 @@ dist\ColorFlow.exe
 - 上传/输出目录自动指向系统临时目录（`COLORFLOW_UPLOAD_DIR` / `COLORFLOW_OUTPUT_DIR`）
 - 详细评估见 `doc/ColorFlow-Web-桌面应用封装可行性评估.md`
 
-## 生产部署提示
+## 生产部署
 
-Flask 内置服务器仅适合本地/内网使用。生产环境建议：
+Flask 内置服务器仅适合本地/内网开发。**生产环境务必使用 `serve.py`（waitress）或 Docker。**
+
+### 方式一：waitress（裸机，Windows/Linux 通用）
 
 ```bash
-pip install gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
+pip install -r requirements.txt    # 含 waitress>=3.0.0
+python serve.py                    # 默认 0.0.0.0:5000，4 线程
 ```
-（Windows 上可用 waitress 替代 gunicorn）
+
+环境变量调优：
+
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `PORT` | 5000 | 监听端口 |
+| `THREADS` | 4 | 工作线程数（CPU 密集型建议 2-8）|
+| `WAITRESS_CHANNEL_TIMEOUT` | 75 | 连接 keepalive 秒数 |
+| `WAITRESS_BACKLOG` | 50 | 监听队列 |
+| `WAITRESS_CLEANUP_INTERVAL` | 1 | 空闲连接清理间隔（秒）|
+
+> gunicorn 仅 Linux/macOS；Windows 请用 waitress。
+> 桌面封装走 `colorflow_desktop_app.py`（PyWebview + Flask 线程）。
+
+### 方式二：Docker
+
+```bash
+# 构建
+docker build -t colorflow-web .
+
+# 运行（环境变量注入 Key，不进镜像层）
+docker run -d \
+  -p 5000:5000 \
+  --env-file .env \
+  -v colorflow-uploads:/tmp/colorflow-uploads \
+  -v colorflow-output:/tmp/colorflow-output \
+  --restart unless-stopped \
+  --name colorflow \
+  colorflow-web
+
+# 健康检查（容器已内置 HEALTHCHECK）
+docker inspect --format='{{.State.Health.Status}}' colorflow
+# → healthy
+```
+
+`.env` 从 `.env.example` 复制后按需填写（Key 注入服务端，不进镜像层）。
+
+### 健康检查端点
+
+`GET /healthz`（**不经 /api/* 鉴权**，供 Docker HEALTHCHECK / K8s 探针 / LB 使用）：
+
+```json
+{
+  "status": "ok",
+  "pid": 2392,
+  "uptime_s": 72.6,
+  "checks": {
+    "colorflow_sdk": true,
+    "rembg": true,
+    "reportlab": true,
+    "gen_backends": ["volcano", "mock"],
+    "vision_backends": ["mock"]
+  }
+}
+```
+
+- 返回 200 表示进程存活
+- 不触发 SDK 抠图模型加载（探针不拖慢冷启动）
+- `checks.*` 为各依赖导入状态与后端可用性（仅探测，不发起网络请求）
+
+### K8s / Docker Compose 示例
+
+```yaml
+# docker-compose.yml（可选）
+services:
+  colorflow:
+    build: .
+    ports: ["5000:5000"]
+    env_file: .env
+    volumes:
+      - ./uploads:/tmp/colorflow-uploads
+      - ./output:/tmp/colorflow-output
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:5000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+```
+
+### 容器镜像安全
+
+- 非 root 用户运行（UID 10001）
+- 基础镜像 `python:3.11-slim`（约 150MB）
+- `.dockerignore` 排除 `.git`/`__pycache__`/测试/文档/桌面打包文件
+- 模型 `silueta.onnx`（~42MB）随镜像附带，无需联网下载
