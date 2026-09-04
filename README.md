@@ -26,21 +26,36 @@ ColorFlow Web 是 **ColorFlow 矢量描图 SDK** 和 **Pantone 色彩管理** �
 | **3D 灰度图** | 彩色位图 → 灰度高度图 / 位移贴图（8/16-bit），用于 3D 建模（Blender / 3D 打印 / 深度通道）+ 实时直方图 |
 | **服务重启** | 设置页「重启服务」按钮一键重启 Flask 实例 |
 | **AI 生图** | 一句话生成包装效果图（火山方舟 / fal.ai / ComfyUI 三后端 auto 降级，零本地 GPU），生成图直接送抠图 / 描图 / Pantone 流水线 |
+| **批量生图** | 一次提交多个 prompt（换行分隔）批量生成，异步任务 + 进度轮询 |
 | **图→prompt 反向闭环** | 上传参考图 → 多模态大模型（OpenAI gpt-4o / Claude / mock）自动描述 → 回填 prompt → 一键生图，完成「图→prompt→生图→描图→Pantone」全闭环 |
-| **AI Agent 接入** | 内置 MCP Server（12 工具），Claude Code / Cursor 可直接调用 |
+| **Prompt 优化** | 「✨ 优化」一键把中文/短 prompt 增强为结构化英文（OpenAI，mock 降级）|
+| **行业模板库** | 12 个预制 prompt 模板 · 6 分类（奢侈品/食品/美妆/电子/文具/促销），支持参数化渲染 |
+| **模板市场** | 自定义模板 + 导入 / 导出 JSON |
+| **参考图库** | 保存/复用参考图（localStorage），点击即加载到反向闭环 |
+| **LLM API Key 管理** | 设置页持久化管理 5 家模型商（OpenAI/Claude/火山/fal/ComfyUI）的 Key + Base URL + **模型名**，保存即生效、重启不丢（不再硬编码 / 不依赖环境变量）|
+| **AI Agent 接入** | 内置 MCP Server（17 工具），Claude Code / Cursor 可直接调用 |
 
-## 技术栈
+## 第三方技术核心清单
 
-| 层级 | 技术 |
-|------|------|
-| 前端 | 原生 HTML + CSS + JS（零框架依赖）|
-| 后端 | Flask + Python 3.11+ |
-| 抠图引擎 | [rembg](https://github.com/danielgatis/rembg)（silueta ONNX 模型，onnxruntime CPU 推理）|
-| 描图引擎 | [VTracer](https://github.com/visioncortex/vtracer) (Rust) |
-| 色彩数据库 | [mcp-print](https://github.com/kcgdz/mcp-print) (2415 Pantone 色) |
-| 矢量输出 | [ColorFlow SDK](https://github.com/Abinius/ColorFlow) |
-| MCP Server | [FastMCP](https://github.com/jlowin/fastmcp) — Agent 标准接入协议 |
-| Key 存储 | JSON 文件（`~/.colorflow/keys.json`，权限 0600）|
+ColorFlow Web 依赖的第三方技术与开源项目（按使用场景分类）：
+
+| 场景 | 技术 / 项目 | 版本 | 许可证 | 核心作用 |
+|------|------------|------|--------|---------|
+| Web 后端 | [Flask](https://flask.palletsprojects.com/) | ≥3.0 | BSD-3-Clause | 全部 API 路由 + 模板渲染 |
+| WSGI 服务 | [waitress](https://github.com/Pylons/waitress) | ≥3.0 | ZPL-2.0 | 生产级 WSGI（Windows/Linux 通用，见 `serve.py`）|
+| AI 抠图 | [rembg](https://github.com/danielgatis/rembg) + [onnxruntime](https://onnxruntime.ai/) | ≥2.0 | MIT | silueta/u2net ONNX 模型，CPU 推理移除背景（模型 42MB 随包）|
+| 矢量描图 | [VTracer](https://github.com/visioncortex/vtracer) | Rust | MIT | 位图 → SVG 矢量描图（经 ColorFlow SDK 调用）|
+| 图像处理 | [Pillow](https://python-pillow.org/) | — | HPND | PNG/JPG/WebP 格式转码、3D 灰度图、PDF 配图 |
+| 色彩数据 | [mcp-print](https://github.com/kcgdz/mcp-print) | ≥0.1 | — | 2415 Pantone 色库、CMYK/ΔE 计算、印刷报价 |
+| 矢量 SDK | [ColorFlow SDK](https://github.com/Abinius/ColorFlow) | git+ | — | 矢量描图/忽略白色/主色提取（本仓库核心引擎）|
+| PDF 输出 | [reportlab](https://www.reportlab.com/) | ≥4.0 | BSD | 印刷级 CMYK PDF 生成 |
+| SVG→PDF | [svglib](https://github.com/deeplook/svglib) | ≥1.5 | LGPL-3.0 | SVG 矢量图渲染进 PDF（export_print）|
+| MCP 协议 | [FastMCP](https://github.com/jlowin/fastmcp) | ≥2.0 | MIT | MCP Server（17 工具，Agent 标准接入）|
+| 前端 | 原生 HTML + CSS + JS | — | — | 零框架依赖（无 React/Vue/构建链）|
+| 前端字体 | [Google Fonts: Inter + JetBrains Mono](https://fonts.google.com/) | — | OFL-1.1 | Figma DESIGN.md 设计规范的字体 |
+| 工作流 CI | [GitHub Actions](https://github.com/features/actions) | — | — | pytest + 产物（`.github/workflows/ci.yml`）|
+
+> 说明：PyInstaller 桌面打包另见 `requirements-desktop.txt`（pywebview + pythonnet + bottle）。全部模型推理为零本地 GPU（CPU / 云端 API）。
 
 ## 快速启动
 
@@ -84,13 +99,15 @@ start.bat
 
 ### 后端（按优先级 auto 降级）
 
-| 后端 | 环境变量 | 说明 |
-|------|---------|------|
-| volcano | `VOLCANO_API_KEY` | 火山方舟 / 即梦 Seedream（国内默认） |
-| fal | `FAL_KEY` | fal.ai 队列（海外，Flux/Seedream 等） |
-| comfyui | `COMFYUI_URL` | 本地 ComfyUI `/prompt` 轮询（可选装） |
+| 后端 | 设置页 provider | 环境变量（备选） | 默认模型 |
+|------|----------------|-----------------|---------|
+| volcano | `火山方舟 · 即梦` | `VOLCANO_API_KEY` | `doubao-seedream-4-0-t2i` |
+| fal | `fal.ai` | `FAL_KEY` | `fal-ai/flux-pro/v1.1` |
+| comfyui | `本地 ComfyUI` | `COMFYUI_URL` | 本地工作流（URL 即配置） |
 
-配置一个或多个环境变量后重启服务生效，设置页「生图后端」标签显示各后端可用性。`backend=auto` 时按 `volcano → fal → comfyui` 探测，失败且 `retryable` 自动降级到下一后端，绝不假成功。
+**推荐配置方式：设置页 → 「大模型 API」→ 对应 provider 填 Key + Base URL + 模型名 → 保存**。Key 持久化到 `~/.colorflow/llm_keys.json`（0600），**保存即生效、重启不丢**，无需设置环境变量。
+
+模型名读取优先级：**设置页配置的 model → 环境变量（`VOLCANO_MODEL` / `FAL_MODEL`）→ 后端默认**。`backend=auto` 时按 `volcano → fal → comfyui` 探测，失败且 `retryable` 自动降级到下一后端，绝不假成功。
 
 ### 可选环境变量
 
@@ -129,13 +146,13 @@ curl http://localhost:5000/api/generate/backends
 
 ### 后端（按优先级 auto 降级）
 
-| 后端 | 环境变量 | 说明 |
-|------|---------|------|
-| openai | `OPENAI_API_KEY` | OpenAI Vision · gpt-4o（事实标准 VLM） |
-| claude | `ANTHROPIC_API_KEY` | Anthropic Claude（备选 VLM） |
-| mock | — | 零 Key 演示 / 测试，返回固定 prompt，不参与主链路 |
+| 后端 | 设置页 provider | 环境变量（备选） | 默认模型 |
+|------|----------------|-----------------|---------|
+| openai | `OpenAI` | `OPENAI_API_KEY` | `gpt-4o`（设置页可改）|
+| claude | `Anthropic Claude` | `ANTHROPIC_API_KEY` | `claude-sonnet-4-6`（设置页可改）|
+| mock | — | — | 零 Key 演示 / 测试，返回固定 prompt，不参与主链路 |
 
-`backend=auto` 时按 `openai → claude` 探测，**未配置任何真实 Key 时直接走 mock 降级**（不报错，`meta.fallback_from` 记录来源），绝不假成功。设置页「生图后端」标签同步显示 Vision 后端可用性。
+`backend=auto` 时按 `openai → claude` 探测，**未配置任何真实 Key 时直接走 mock 降级**（不报错，`meta.fallback_from` 记录来源），绝不假成功。Key + 模型名同样通过设置页「大模型 API」持久化管理。
 
 ### 可选环境变量
 
@@ -162,20 +179,36 @@ curl -X POST http://localhost:5000/api/prompt/generate \
 curl http://localhost:5000/api/prompt/backends
 ```
 
-> 红线：Key 仅存服务端环境变量，不进前端；零本地 GPU；失败可降级不假成功。
-> 前端 Tab 6「反向闭环」上传区 → 「🔍 提取 prompt」按钮 → 自动回填 prompt 框并启用生成。
+> 红线：Key 仅存服务端（设置页 Key Store / 环境变量），不进前端；零本地 GPU；失败可降级不假成功。
+> 前端 Tab 6「反向闭环」上传区 → 「提取 prompt」按钮 → 自动回填 prompt 框并启用生成。
 > MCP 工具 `image_to_prompt` 与 `full_pipeline(image_path=...)` 支持一句话闭环。
 
-## API Key 管理
+## 钥匙体系（两类 Key 分离）
 
-### 生成 Key（推荐）
+ColorFlow 有两把独立的钥匙，都存在服务端本地（均 0600 权限），互不混淆：
+
+| 钥匙 | 存储文件 | 用途 | 生成方式 |
+|------|---------|------|---------|
+| **应用 API Key**（`cf_sk_*`）| `~/.colorflow/keys.json` | 前端请求 / MCP 接入鉴权（`x-api-key` 头）| 设置页 → 「生成新 Key」 |
+| **大模型 Key** | `~/.colorflow/llm_keys.json` | 生图 / 图→prompt / Prompt 优化 调用第三方大模型 | 设置页 → 「大模型 API」→ 对应 provider |
+
+### 应用 API Key（`cf_sk_*`）
 
 启动服务后打开 **设置页**（左栏底部齿轮图标）→ 「生成新 Key」按钮 → 输入名称 → Key 明文仅显示一次 → 自动填充到 MCP 配置。
 
-- Key 存储在 `~/.colorflow/keys.json`（文件权限 0600）
 - 支持多个 Key，每个可命名 / 撤销
 - 撤销后即时生效，所有请求立即被拒
 - 首次无 Key 时全部开放（本地开发模式）
+
+### 大模型 API Key（`llm_keys.json`）
+
+设置页 → 「大模型 API」（合并页：生图后端状态 + Key 配置 + 环境变量备选）→ 每个 provider 可填：
+
+- **Key**：火山方舟 / fal.ai / OpenAI / Claude 的 API Key；ComfyUI 填 `http://127.0.0.1:8188`
+- **Base URL**：可选，兼容代理（Azure/OpenRouter）
+- **模型名**：可选，覆盖该后端默认模型（如 `doubao-seedream-4-0-t2i` / `gpt-4o` / `flux-pro`）
+
+保存即生效、重启不丢；读取优先级：**设置页 → 环境变量 → 后端默认**。删除 Key 后自动回退到环境变量 / mock 降级。
 
 ### 环境变量（向后兼容）
 
@@ -326,12 +359,18 @@ Agent: 调用 full_pipeline(image_path="D:/reference.png", width_mm=210, height_
 | `POST` | `/api/generate` | AI 生图（同步）→ PNG（base64），backend=auto 按优先级降级 |
 | `POST` | `/api/generate/jobs` | AI 生图（异步任务）→ `{job_id, status:"queued"}` |
 | `GET` | `/api/generate/jobs/<id>` | 查询任务状态 queued/running/done/failed（done 携 images）|
-| `GET` | `/api/generate/backends` | 生图后端状态（volcano/fal/comfyui 可用性）|
+| `GET` | `/api/generate/backends` | 生图后端状态（volcano/fal/comfyui 可用性 + 当前模型名）|
+| `POST` | `/api/generate/batch` | 批量生图（换行分隔 prompts）→ `{batch_id, status:"queued"}` |
+| `GET` | `/api/generate/batch/<batch_id>` | 查询批量任务状态（done 携 images/errors）|
 | `GET` | `/api/prompt/backends` | 图→prompt 后端状态（openai/claude/mock 可用性）|
 | `POST` | `/api/prompt/generate` | 图→prompt（image2prompt）→ 英文 prompt，用于回填 GEN 提示词框 |
+| `POST` | `/api/prompt/optimize` | prompt 优化（中文/短 prompt → 增强版英文）|
 | `GET` | `/api/prompt-templates` | 列出行业预制 prompt 模板（可按 category/search 过滤）|
 | `GET` | `/api/prompt-templates/<id>` | 获取单个模板完整定义（含 prompt 原文和 params）|
 | `POST` | `/api/prompt-templates/render` | 渲染模板 → 完整 prompt（支持 JSON 和 form 两种提交）|
+| `GET` | `/api/llm-keys` | 列出所有大模型 provider 的 Key 状态（脱敏 + 当前模型）|
+| `POST` | `/api/llm-keys` | 设置某 provider 的 Key + config{base_url, model}（空串 = 清除）|
+| `DELETE` | `/api/llm-keys/<provider>` | 删除某 provider 的大模型 Key |
 | `POST` | `/api/restart` | 触发服务重启（异步启动 restart.ps1）|
 | `POST` | `/api/keys/generate` | 生成新 API Key |
 | `GET` | `/api/keys` | 列出所有 Key（脱敏）|
@@ -439,32 +478,34 @@ curl -X POST http://localhost:5000/api/restart
 
 ```
 colorflow-web/
-├── app.py               # Flask 入口，所有 API 路由 + Key 管理 + 3D 灰度图 + AI 生图(同步/任务) + 图→prompt + 服务重启
-├── gen_backends.py      # GEN 生图适配器层（volcano / fal / comfyui + auto 降级 + GenResult/GenError）
+├── app.py               # Flask 入口：35+ API 路由 + Key 管理 + 3D 灰度图 + AI 生图(同步/任务/批量) + 图→prompt + prompt 优化/模板 + 服务重启
+├── gen_backends.py      # GEN 生图适配器层（volcano / fal / comfyui + auto 降级 + GenResult/GenError + 模型名读取 Key Store）
 ├── vision_backends.py   # VISION 图→prompt 适配器层（openai / claude / mock + auto 降级 + PromptResult/PromptError）
 ├── prompt_templates.py  # Prompt 模板库加载器（assets/prompt_templates.json → render）
 ├── prompt_optimizer.py  # Prompt 优化器（OpenAI Chat API，mock 降级）
-├── colorflow_keys.py    # KeyStore：API Key 生成 / 校验 / 撤销
+├── llm_keys.py          # LLM Key Store：5 家大模型 Key/Base/模型名 持久化管理（~/.colorflow/llm_keys.json）
+├── colorflow_keys.py    # KeyStore：应用 API Key（cf_sk_*）生成 / 校验 / 撤销
 ├── mcp_server.py        # MCP Server（17 工具 + Key 认证）
 ├── colorflow_desktop_app.py   # 桌面入口（PyWebview 原生窗口 + Flask 线程）
 ├── colorflow_desktop_app.spec # PyInstaller 打包配置
 ├── restart.ps1          # 服务重启脚本（杀旧进程 + 拉起新实例）
 ├── templates/
-│   └── index.html      # 单页（抠图 / 描图 / Pantone / 色彩匹配 / 3D 灰度图 / AI 生图+图→prompt 反向闭环 + 设置页）
+│   └── index.html      # 单页（抠图 / 描图 / Pantone / 色彩匹配 / 3D 灰度图 / AI 生图+反向闭环 / 参考图库 / 批量生图 / 模板市场 + 设置页）
 ├── static/
 │   ├── style.css       # Figma DESIGN.md 样式
-│   ├── app.js          # 前端交互 + Key 管理 + MCP 配置 + 3D 灰度图 + AI 生图(任务轮询) + 图→prompt 提取
+│   ├── app.js          # 前端交互（全站 SVG 图标）+ Key 管理 + MCP 配置 + 3D 灰度图 + AI 生图(任务轮询) + 图→prompt 提取
 │   └── favicon.*       # 浏览器图标（ico/png/svg/manifest）
 ├── assets/
 │   └── gen_workflow_api.json  # ComfyUI 文生图工作流模板（可替换本机构造）
 │   └── prompt_templates.json  # 行业预制 prompt 模板库（12 模板 · 6 分类）
 ├── models/
 │   └── silueta.onnx    # 抠图模型（42MB，随包附带）
-├── tests/
-│   ├── conftest.py     # 共享配置（U2NET_HOME 回退包内模型）
+├── tests/              # 212 用例
+│   ├── conftest.py     # 共享配置（U2NET_HOME 回退包内模型 + LLM Key Store 隔离到临时文件）
 │   ├── test_app.py     # API 集成测试 + Key 管理 + 3D 灰度图 + 抠图/忽略白色
 │   ├── test_mcp.py     # MCP Server 全工具测试
-│   └── test_gen.py     # GEN 生图适配器（mock 后端 + auto 降级 + 任务模式 + 流水线）+ VISION 图→prompt 反向闭环
+│   ├── test_gen.py     # GEN 生图适配器 + VISION 图→prompt + LLM Key Store 模型解析
+│   ├── test_llm_keys.py# LLM Key Store（模块 + /api/llm-keys 端点全量测试）
 │   └── test_prompt_templates.py  # Prompt 模板库（模块/API/MCP 全量测试）
 ├── .github/workflows/ci.yml  # GitHub Actions（pytest + zip 产物）
 ├── start.bat           # Windows 一键启动
@@ -477,7 +518,7 @@ colorflow-web/
 
 ```bash
 pip install pytest
-python -m pytest tests/ -q     # 186 个用例
+python -m pytest tests/ -q     # 212 个用例
 ```
 
 ## 相关项目
