@@ -1470,6 +1470,117 @@ def prompt_template_render():
         return jsonify({"error": str(e)}), 500
 
 
+# ============================================================
+# 运行时配置（大模型 API / MCP Key）
+# ============================================================
+#
+# 设置页「大模型 API」和「MCP API Key」标签通过本组端点读写运行时配置。
+# Key 仅存当前进程内存（os.environ），不进镜像/磁盘，重启后需重新配置
+# 或通过环境变量注入。前端 Key 存储于 localStorage（MCP Key）。
+# 响应中 Key 值脱敏（仅显示前 6 位 + 后 4 位），绝不回显完整明文。
+
+def _mask_key(k: str, show_prefix: int = 6, show_suffix: int = 4) -> str:
+    """脱敏 Key：仅显示前 N 位和后 M 位"""
+    if not k:
+        return ""
+    if len(k) <= show_prefix + show_suffix + 3:
+        return k[:show_prefix] + "…" + k[-show_suffix:]
+    return k[:show_prefix] + "…" + k[-show_suffix:]
+
+
+@app.route("/api/config/llm", methods=["GET"])
+def get_llm_config():
+    """获取大模型 API 当前配置（脱敏）。"""
+    openai_key = os.getenv("OPENAI_API_KEY", "")
+    claude_key = os.getenv("ANTHROPIC_API_KEY", "")
+    return jsonify({
+        "success": True,
+        "openai": {
+            "key": _mask_key(openai_key) if openai_key else "",
+            "key_set": bool(openai_key),
+            "base_url": os.getenv("OPENAI_BASE_URL", ""),
+            "model": os.getenv("VISION_MODEL_OPENAI", "gpt-4o"),
+        },
+        "claude": {
+            "key": _mask_key(claude_key) if claude_key else "",
+            "key_set": bool(claude_key),
+            "base_url": os.getenv("ANTHROPIC_BASE_URL", ""),
+            "model": os.getenv("VISION_MODEL_CLAUDE", "claude-sonnet-4-6"),
+        },
+        "vision_backends": vision_available_backends(),
+    })
+
+
+@app.route("/api/config/llm", methods=["POST"])
+def set_llm_config():
+    """保存大模型 API 配置（写入当前进程 os.environ）。
+
+    JSON body:
+        openai_key:     OpenAI API Key（空串表示清除）
+        openai_base:    OpenAI Base URL（可选）
+        openai_model:   OpenAI 模型名（可选）
+        claude_key:     Anthropic API Key（空串表示清除）
+        claude_base:    Anthropic Base URL（可选）
+        claude_model:   Claude 模型名（可选）
+    """
+    data = request.get_json(silent=True) or {}
+    updates = {}
+
+    # OpenAI
+    if "openai_key" in data:
+        v = (data["openai_key"] or "").strip()
+        if v:
+            os.environ["OPENAI_API_KEY"] = v
+            updates["OPENAI_API_KEY"] = v[:6] + "…"
+        else:
+            os.environ.pop("OPENAI_API_KEY", None)
+            updates["OPENAI_API_KEY"] = "(已清除)"
+    if "openai_base" in data:
+        v = (data["openai_base"] or "").strip()
+        if v:
+            os.environ["OPENAI_BASE_URL"] = v
+            updates["OPENAI_BASE_URL"] = v
+        else:
+            os.environ.pop("OPENAI_BASE_URL", None)
+    if "openai_model" in data:
+        v = (data["openai_model"] or "").strip()
+        if v:
+            os.environ["VISION_MODEL_OPENAI"] = v
+            updates["VISION_MODEL_OPENAI"] = v
+
+    # Claude
+    if "claude_key" in data:
+        v = (data["claude_key"] or "").strip()
+        if v:
+            os.environ["ANTHROPIC_API_KEY"] = v
+            updates["ANTHROPIC_API_KEY"] = v[:6] + "…"
+        else:
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            updates["ANTHROPIC_API_KEY"] = "(已清除)"
+    if "claude_base" in data:
+        v = (data["claude_base"] or "").strip()
+        if v:
+            os.environ["ANTHROPIC_BASE_URL"] = v
+            updates["ANTHROPIC_BASE_URL"] = v
+        else:
+            os.environ.pop("ANTHROPIC_BASE_URL", None)
+    if "claude_model" in data:
+        v = (data["claude_model"] or "").strip()
+        if v:
+            os.environ["VISION_MODEL_CLAUDE"] = v
+            updates["VISION_MODEL_CLAUDE"] = v
+
+    if not updates:
+        return jsonify({"error": "无配置更新"}), 400
+
+    return jsonify({
+        "success": True,
+        "updated": updates,
+        "vision_backends": vision_available_backends(),
+        "note": "配置已生效（当前进程），重启后需重新配置或通过环境变量注入",
+    })
+
+
 if __name__ == "__main__":
     app.run(
         host="0.0.0.0",

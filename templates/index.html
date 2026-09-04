@@ -94,7 +94,10 @@
         <span>ColorFlow</span> ·
         <a href="https://github.com/Abinius/ColorFlow" target="_blank">GitHub</a>
         <button class="icon-btn settings-icon" id="settingsToggle" aria-label="打开设置">
-          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 1a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" fill="currentColor"/><path d="M6.5 1.5l-.5 1.2-1.3.3-.8-1L2.5 3l.3 1.3-1 .8-1.2-.5L0 6l1.2.5.5 1.2-.3 1.3-1 .8L1 11l1.3-.3.8 1 1.2-.5.5-1.2 1.3-.3.8 1L7 14.5l.5-1.2 1.3-.3.8 1L11 13l-.3-1.3 1-.8 1.2.5L14 10l-1.2-.5-.5-1.2.3-1.3 1-.8L13 5l-1.3.3-.8-1-1.2.5-.5 1.2-1.3.3-.8-1L7 1.5z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true">
+            <circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
         </button>
       </footer>
     </aside>
@@ -128,6 +131,10 @@
               <button class="settings-nav-item" data-nav="gen">
                 <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.8 4.2 4.2.3-3.3 2.7 1.1 4.1L8 11.5 4.2 13.4l1.1-4.1L2 6.6l4.2-.3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
                 生图后端
+              </button>
+              <button class="settings-nav-item" data-nav="llm">
+                <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="5" cy="5" r="3" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="11" cy="11" r="3" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M7.5 7.5 8.5 8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                大模型 API
               </button>
             </div>
           </nav>
@@ -181,7 +188,16 @@
                 <button class="btn btn-small btn-primary" id="copyMcpConfigBtn">复制配置</button>
               </div>
               <div class="settings-section">
-                <p class="settings-desc">可用工具（13 个）</p>
+                <p class="settings-desc">MCP API Key（用于 MCP Server 鉴权，与 API Key 标签生成的 Key 共用）</p>
+                <input type="password" id="mcpApiKeyInput" class="key-input" placeholder="cfk_xxxxxxxx（可选，留空则 MCP 无鉴权）" />
+                <div class="key-input-actions">
+                  <button class="btn btn-small btn-secondary" id="mcpApiKeySaveBtn">保存</button>
+                  <button class="btn btn-small btn-secondary" id="mcpApiKeyToggle">显示</button>
+                  <span class="settings-hint" id="mcpApiKeyHint"></span>
+                </div>
+              </div>
+              <div class="settings-section">
+                <p class="settings-desc">可用工具（16 个）</p>
                 <div class="mcp-tools-list">
                   <span class="mcp-tool-tag">trace_image</span>
                   <span class="mcp-tool-tag">cutout</span>
@@ -195,7 +211,10 @@
                   <span class="mcp-tool-tag">greyscale3d</span>
                   <span class="mcp-tool-tag">export_pantone_pdf</span>
                   <span class="mcp-tool-tag">generate_image</span>
+                  <span class="mcp-tool-tag">image_to_prompt</span>
                   <span class="mcp-tool-tag">full_pipeline</span>
+                  <span class="mcp-tool-tag">prompt_templates</span>
+                  <span class="mcp-tool-tag">prompt_render</span>
                 </div>
               </div>
             </div>
@@ -212,6 +231,45 @@
                   <code>VOLCANO_API_KEY</code> · 火山方舟（国内默认）<br/>
                   <code>FAL_KEY</code> · fal.ai（海外）<br/>
                   <code>COMFYUI_URL</code> · 本地 ComfyUI（可选装）
+                </div>
+              </div>
+            </div>
+            <div class="settings-page" id="nav-llm">
+              <div class="settings-section">
+                <p class="settings-desc">大模型 API 用于「图→prompt」反向闭环（Vision 后端），配置后自动启用 openai / claude</p>
+                <div class="gen-backends-list" id="visionBackendsList">
+                  <div class="key-empty">加载中...</div>
+                </div>
+              </div>
+              <div class="settings-section">
+                <p class="settings-desc">OpenAI Vision（gpt-4o）</p>
+                <input type="password" id="openaiKeyInput" class="key-input" placeholder="sk-xxxxxxxx（可选，留空则用环境变量 OPENAI_API_KEY）" />
+                <input type="text" id="openaiBaseInput" class="key-input" placeholder="Base URL（可选，默认 https://api.openai.com/v1）" style="margin-top:6px" />
+                <div class="key-input-actions">
+                  <button class="btn btn-small btn-secondary" id="openaiKeySaveBtn">保存</button>
+                  <button class="btn btn-small btn-secondary" id="openaiKeyToggle">显示</button>
+                  <span class="settings-hint" id="openaiKeyHint"></span>
+                </div>
+              </div>
+              <div class="settings-section">
+                <p class="settings-desc">Anthropic Claude（备选 VLM）</p>
+                <input type="password" id="claudeKeyInput" class="key-input" placeholder="sk-ant-xxxxxxxx（可选，留空则用环境变量 ANTHROPIC_API_KEY）" />
+                <input type="text" id="claudeBaseInput" class="key-input" placeholder="Base URL（可选，默认 https://api.anthropic.com）" style="margin-top:6px" />
+                <div class="key-input-actions">
+                  <button class="btn btn-small btn-secondary" id="claudeKeySaveBtn">保存</button>
+                  <button class="btn btn-small btn-secondary" id="claudeKeyToggle">显示</button>
+                  <span class="settings-hint" id="claudeKeyHint"></span>
+                </div>
+              </div>
+              <div class="settings-section">
+                <p class="settings-desc">未配置真实 Key 时自动降级 mock（不报错，meta.fallback_from 记录来源）</p>
+                <div class="gen-env-hint">
+                  <code>OPENAI_API_KEY</code> · OpenAI Vision（gpt-4o，默认）<br/>
+                  <code>ANTHROPIC_API_KEY</code> · Anthropic Claude（备选）<br/>
+                  <code>VISION_MODEL_OPENAI</code> · 模型名（默认 gpt-4o）<br/>
+                  <code>VISION_MODEL_CLAUDE</code> · 模型名（默认 claude-sonnet-4-6）<br/>
+                  <code>OPENAI_BASE_URL</code> · 兼容代理（Azure/OpenRouter）<br/>
+                  <code>ANTHROPIC_BASE_URL</code> · 兼容代理
                 </div>
               </div>
             </div>

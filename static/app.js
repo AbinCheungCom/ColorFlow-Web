@@ -80,7 +80,9 @@ async function loadKeyList() {
 function updateMcpConfig() {
   const block = document.getElementById('mcpConfig');
   if (!block) return;
-  const key = localStorage.getItem('colorflow_api_key') || '（请先生成 Key）';
+  const key = localStorage.getItem('colorflow_mcp_key')
+    || localStorage.getItem('colorflow_api_key')
+    || '（请先生成 Key）';
   const scriptPath = window.location.pathname.replace(/\/$/, '') || '.';
   const config = {
     mcpServers: {
@@ -192,6 +194,7 @@ function openSettingsModal() {
   loadKeyList();
   updateMcpConfig();
   loadGenBackends();
+  loadLLMConfig();
 }
 function closeSettingsModal() {
   settingsModal.classList.remove('open');
@@ -1181,6 +1184,111 @@ async function loadGenBackends() {
   }
 }
 
+// 后端状态面板（设置页 nav-llm）
+async function loadVisionBackends() {
+  const list = document.getElementById('visionBackendsList');
+  if (!list) return;
+  try {
+    const resp = await apiFetch('/api/prompt/backends');
+    const data = await resp.json();
+    if (!data.success) { list.innerHTML = '<div class="key-empty">加载失败</div>'; return; }
+    if (!data.any_configured) {
+      list.innerHTML = '<div class="key-empty">未配置任何大模型 Key · 将使用 mock 降级</div>';
+      return;
+    }
+    list.innerHTML = data.backends.map(b => {
+      const dot = b.available ? '✅' : '❌';
+      return `<div class="gen-backend-row"><span class="gen-backend-dot">${dot}</span>
+        <span class="gen-backend-label">${escapeHtml(b.label)}</span></div>`;
+    }).join('');
+  } catch (e) {
+    list.innerHTML = '<div class="key-empty">加载失败</div>';
+  }
+}
+
+// 大模型 API 配置加载
+async function loadLLMConfig() {
+  try {
+    const resp = await apiFetch('/api/config/llm');
+    const data = await resp.json();
+    if (!data.success) return;
+    const oaiKey = document.getElementById('openaiKeyInput');
+    const oaiBase = document.getElementById('openaiBaseInput');
+    const cldKey = document.getElementById('claudeKeyInput');
+    const cldBase = document.getElementById('claudeBaseInput');
+    if (oaiKey) oaiKey.placeholder = data.openai.key_set
+      ? '已配置：' + data.openai.key
+      : 'sk-xxxxxxxx（可选，留空则用环境变量 OPENAI_API_KEY）';
+    if (oaiBase) oaiBase.value = data.openai.base_url || '';
+    if (cldKey) cldKey.placeholder = data.claude.key_set
+      ? '已配置：' + data.claude.key
+      : 'sk-ant-xxxxxxxx（可选，留空则用环境变量 ANTHROPIC_API_KEY）';
+    if (cldBase) cldBase.value = data.claude.base_url || '';
+    loadVisionBackends();
+  } catch (e) { /* 静默失败 */ }
+}
+
+// 通用 Key 输入框保存/显示/隐藏
+function setupKeyInput(keyId, baseId, saveField, baseField) {
+  const keyInput = document.getElementById(keyId);
+  const baseInput = document.getElementById(baseId);
+  const saveBtn = document.getElementById(keyId.replace('Input', 'SaveBtn'));
+  const toggleBtn = document.getElementById(keyId.replace('Input', 'Toggle'));
+  const hint = document.getElementById(keyId.replace('Input', 'Hint'));
+  if (!keyInput || !saveBtn) return;
+  saveBtn.addEventListener('click', async () => {
+    const payload = {};
+    payload[saveField] = keyInput.value.trim();
+    if (baseInput) payload[baseField] = baseInput.value.trim();
+    try {
+      const resp = await apiFetch('/api/config/llm', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await resp.json();
+      if (data.success) {
+        hint.textContent = '✅ 已保存'; hint.style.color = 'var(--success)';
+        keyInput.value = ''; loadVisionBackends();
+        setTimeout(() => { hint.textContent = ''; }, 2500);
+      } else {
+        hint.textContent = '❌ ' + (data.error || '保存失败');
+        hint.style.color = 'var(--error)';
+      }
+    } catch (e) {
+      hint.textContent = '❌ ' + fetchErrorMessage(e); hint.style.color = 'var(--error)';
+    }
+  });
+  toggleBtn.addEventListener('click', () => {
+    const isPwd = keyInput.type === 'password';
+    keyInput.type = isPwd ? 'text' : 'password';
+    toggleBtn.textContent = isPwd ? '隐藏' : '显示';
+  });
+}
+
+// MCP API Key（存 localStorage）
+function setupMcpApiKey() {
+  const input = document.getElementById('mcpApiKeyInput');
+  const saveBtn = document.getElementById('mcpApiKeySaveBtn');
+  const toggleBtn = document.getElementById('mcpApiKeyToggle');
+  const hint = document.getElementById('mcpApiKeyHint');
+  if (!input) return;
+  const saved = localStorage.getItem('colorflow_mcp_key');
+  if (saved) { input.value = saved; input.placeholder = '已配置（' + saved.slice(0,6) + '…）'; }
+  saveBtn.addEventListener('click', () => {
+    const v = input.value.trim();
+    if (v) { localStorage.setItem('colorflow_mcp_key', v); hint.textContent = '✅ 已保存'; }
+    else { localStorage.removeItem('colorflow_mcp_key'); hint.textContent = '✅ 已清除'; }
+    hint.style.color = 'var(--success)';
+    input.value = ''; input.placeholder = 'cfk_xxxxxxxx（可选，留空则 MCP 无鉴权）';
+    updateMcpConfig(); setTimeout(() => { hint.textContent = ''; }, 2500);
+  });
+  toggleBtn.addEventListener('click', () => {
+    const isPwd = input.type === 'password';
+    input.type = isPwd ? 'text' : 'password';
+    toggleBtn.textContent = isPwd ? '隐藏' : '显示';
+  });
+}
+
 // base64 → Blob
 function genBase64ToBlob(b64, type = 'image/png') {
   const bin = atob(b64);
@@ -1481,3 +1589,10 @@ if (genTplSelect && !genTplSelect.value) {
   // 初始加载
   loadGenTemplates();
 }
+
+// ============================================================
+// 设置页初始化：大模型 API + MCP Key
+// ============================================================
+setupKeyInput('openaiKeyInput', 'openaiBaseInput', 'openai_key', 'openai_base');
+setupKeyInput('claudeKeyInput', 'claudeBaseInput', 'claude_key', 'claude_base');
+setupMcpApiKey();
