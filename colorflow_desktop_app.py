@@ -46,11 +46,8 @@ def setup_environment():
         log(f"U2NET_HOME: {models_dir}")
 
     import tempfile
-    upload_dir = pathlib.Path(tempfile.gettempdir()) / "colorflow-uploads"
     output_dir = pathlib.Path(tempfile.gettempdir()) / "colorflow-output"
-    upload_dir.mkdir(exist_ok=True)
     output_dir.mkdir(exist_ok=True)
-    os.environ["COLORFLOW_UPLOAD_DIR"] = str(upload_dir)
     os.environ["COLORFLOW_OUTPUT_DIR"] = str(output_dir)
 
 

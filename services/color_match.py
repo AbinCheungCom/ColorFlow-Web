@@ -18,11 +18,12 @@ def _interpret_de(de: float) -> str:
     return "poor — obvious difference"
 
 
-def match(hex_color: str) -> list[dict]:
-    """HEX → 最近 5 个 Pantone 匹配，含 ΔE、CMYK、RGB。
+def match(hex_color: str, limit: int = 5) -> list[dict]:
+    """HEX → 最近的 Pantone 匹配，含 ΔE、CMYK、RGB。
 
     Args:
         hex_color: HEX 颜色（#RRGGBB）
+        limit: 返回的匹配数（默认 5）
 
     Returns:
         匹配列表，每项含 name/hex/cmyk/rgb/delta_e/interpretation
@@ -32,7 +33,7 @@ def match(hex_color: str) -> list[dict]:
     lab_hex = _rgb_to_lab(*rgb_hex)
 
     matches = []
-    for m in results.get("matches", [])[:5]:
+    for m in results.get("matches", [])[:limit]:
         c, mm, y, k = m["c"], m["m"], m["y"], m["k"]
         lab_pantone = _cmyk_to_lab(c, mm, y, k)
         de = round(delta_e_cie76(lab_hex, lab_pantone), 2)

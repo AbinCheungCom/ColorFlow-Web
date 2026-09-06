@@ -17,9 +17,9 @@ class Grey3DResult:
     height: int
     bit_depth: int
     histogram: list = None  # 256 bin 归一化直方图（仅 Web 端使用）
-    hist_peak: int = 0
-    min_value: int = 0
-    max_value: int = 0
+    hist_peak: int = 0      # 直方图峰值 bin 索引（0-255）
+    min_value: int = 0      # 直方图 bin 计数的最小值（非像素值范围）
+    max_value: int = 0      # 直方图 bin 计数的最大值（非像素值范围）
 
 
 def generate(

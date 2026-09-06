@@ -44,8 +44,8 @@ def _get_base(provider: str, default: str) -> str:
     try:
         from llm_keys import llm_keystore
         cfg = llm_keystore.get_config(provider)
-        if cfg and isinstance(cfg, dict):
-            return cfg.get("base_url", "")
+        if cfg and isinstance(cfg, dict) and cfg.get("base_url"):
+            return cfg["base_url"]
     except Exception:
         pass
     env_map = {"volcano": "VOLCANO_BASE_URL", "fal": "FAL_BASE_URL", "comfyui": "COMFYUI_URL"}
@@ -271,7 +271,8 @@ def _gen_fal(prompt: str, ref_image: bytes = None,
         model = _get_model("fal", "FAL_MODEL", "fal-ai/flux-pro/v1.1")
     w, h = _parse_size(size)
 
-    submit_url = f"https://queue.fal.run/{model}"
+    fal_base = _get_base("fal", "https://queue.fal.run").rstrip("/")
+    submit_url = f"{fal_base}/{model}"
     body = {
         "prompt": prompt,
         "image_size": {"width": w, "height": h},
@@ -287,7 +288,7 @@ def _gen_fal(prompt: str, ref_image: bytes = None,
         raise GenError("upstream", f"fal 未返回 request_id: {str(submit)[:200]}", retryable=True)
 
     # 轮询状态
-    status_url = f"https://queue.fal.run/{model}/requests/{rid}/status"
+    status_url = f"{fal_base}/{model}/requests/{rid}/status"
     deadline = time.time() + timeout
     last_status = None
     while time.time() < deadline:
@@ -304,7 +305,7 @@ def _gen_fal(prompt: str, ref_image: bytes = None,
         raise GenError("timeout", f"fal 轮询超时 (status={last_status})", retryable=True)
 
     # 取结果
-    result_url = f"https://queue.fal.run/{model}/requests/{rid}"
+    result_url = f"{fal_base}/{model}/requests/{rid}"
     result = _http_json(result_url, method="GET",
                         headers={"Authorization": f"Key {key}"}, timeout=timeout)
     imgs = (result.get("images") or result.get("data", {}).get("images") or [])
@@ -471,8 +472,14 @@ def dispatch(prompt: str, ref_image: bytes = None,
     """
     if not prompt or not prompt.strip():
         raise GenError("bad_prompt", "prompt 不能为空", retryable=False)
-    n = max(1, min(int(n), int(os.getenv("GEN_MAX_IMAGES", "4"))))
-    timeout = int(os.getenv("GEN_TIMEOUT", str(timeout)) or timeout)
+    # ref_image 类型校验：只接受 bytes 或 None（JSON 路径可能传入 str）
+    if ref_image is not None and not isinstance(ref_image, (bytes, bytearray)):
+        raise GenError("bad_prompt", "ref_image 必须是 bytes（PNG/JPG 字节），不接受 str", retryable=False)
+    try:
+        n = max(1, min(int(n), int(os.getenv("GEN_MAX_IMAGES", "4"))))
+        timeout = int(os.getenv("GEN_TIMEOUT", str(timeout)) or timeout)
+    except (TypeError, ValueError):
+        raise GenError("bad_prompt", "n 或 GEN_TIMEOUT 参数非法", retryable=False)
 
     # 指定后端
     if backend and backend != "auto":
@@ -486,7 +493,12 @@ def dispatch(prompt: str, ref_image: bytes = None,
             raise GenError("auth", "未配置 FAL_KEY", retryable=False)
         if backend == "comfyui" and not _get_key("comfyui"):
             raise GenError("auth", "未配置 COMFYUI_URL", retryable=False)
-        return fn(prompt, ref_image=ref_image, size=size, n=n, timeout=timeout, model=model)
+        try:
+            return fn(prompt, ref_image=ref_image, size=size, n=n, timeout=timeout, model=model)
+        except GenError:
+            raise
+        except Exception as e:
+            raise GenError("upstream", f"后端 {backend} 异常: {type(e).__name__}", retryable=True) from e
 
     # auto：按优先级探测可用后端，retryable 失败降级
     avail = available_backends()
@@ -505,5 +517,9 @@ def dispatch(prompt: str, ref_image: bytes = None,
                            bid, e.code, e.retryable, e)
             if not e.retryable and e.code == "bad_prompt":
                 break  # prompt 本身非法，换后端无意义
+            continue
+        except Exception as e:
+            last_err = GenError("upstream", f"后端 {bid} 异常: {type(e).__name__}", retryable=True)
+            logger.warning("后端 %s 异常: %s — 尝试下一后端", bid, e, exc_info=True)
             continue
     raise last_err or GenError("upstream", "所有后端均失败", retryable=False)

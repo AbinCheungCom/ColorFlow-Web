@@ -19,14 +19,7 @@ import os
 
 from fastmcp import FastMCP
 
-from colorflow_sdk import extract_svg_colors
-from mcp_print.tools.colors import (
-    _cmyk_to_lab,
-    _hex_to_rgb,
-    _rgb_to_lab,
-    pantone_search,
-    pantone_to_cmyk,
-)
+from mcp_print.tools.colors import pantone_to_cmyk
 from mcp_print.tools.cost import print_cost_estimate
 
 # 复用 Web 应用中的 SDK 实例（同一份 VTracer 输出目录等）
@@ -34,8 +27,6 @@ from app import sdk
 
 # API Key 校验（与 Web API 共用同一份 KeyStore）
 from colorflow_keys import keystore
-
-from services.color_delta_e import delta_e_cie76
 
 from gen_backends import dispatch as gen_dispatch, GenError as GenGenError
 from vision_backends import dispatch_prompt, PromptError as GenPromptError
@@ -67,16 +58,8 @@ def _auth_check() -> str | None:
 
 # 允许的图片扩展名
 ALLOWED_EXT = (".png", ".jpg", ".jpeg", ".webp", ".bmp")
-# 可用抠图模型清单
-REMBG_MODELS = ("silueta", "u2net", "u2net_human_seg", "u2netp", "dis_anime",
-                "dis_general_use", "withoutbg", "bria-rmbg")
-
-
-def _delta_e(hex_color: str, cmyk) -> float:
-    """计算 HEX 与某 CMYK 色之间的 ΔE（CIELAB 欧氏距离近似）"""
-    lab_hex = _rgb_to_lab(*_hex_to_rgb(hex_color))
-    lab_pantone = _cmyk_to_lab(*cmyk)
-    return delta_e_cie76(lab_hex, lab_pantone)
+# 可用抠图模型清单（与 app.py REMBG_MODELS 对齐：仅随包附带的 2 个）
+REMBG_MODELS = ("silueta", "u2net_human_seg")
 
 
 def _check_ext(image_path: str) -> str | None:
@@ -981,7 +964,6 @@ def full_pipeline(
     if not prompt or not prompt.strip():
         return json.dumps({"error": "prompt 与 image_path 至少提供一个"}, ensure_ascii=False)
 
-    from mcp_print.tools.colors import cmyk_to_rgb
     import tempfile
     import zipfile
 
@@ -1026,24 +1008,12 @@ def full_pipeline(
         # ── 4) 主色 + Pantone 匹配 ─────────────────────────────
         with open(svg_path, "rb") as f:
             svg_bytes = f.read()
-        palette = []
-        for c in extract_svg_colors(svg_bytes, top_n=5):
-            matches = []
-            try:
-                for m in pantone_search(hex_color=c["hex"]).get("matches", [])[:3]:
-                    rgb = cmyk_to_rgb(m["c"], m["m"], m["y"], m["k"])
-                    matches.append({
-                        "name": m["name"],
-                        "hex": m["hex"],
-                        "cmyk": [m["c"], m["m"], m["y"], m["k"]],
-                        "rgb": [rgb["r"], rgb["g"], rgb["b"]],
-                        "delta_e": round(
-                            _delta_e(c["hex"], (m["c"], m["m"], m["y"], m["k"])), 2
-                        ),
-                    })
-            except Exception as e:
-                errors.append(f"Pantone 匹配失败（跳过该色）: {e}")
-            palette.append({"color": c, "pantone_matches": matches})
+        try:
+            from services.pipeline import build_palette
+            palette = build_palette(svg_bytes, top_n=5)
+        except Exception as e:
+            palette = []
+            errors.append(f"调色板构建失败: {e}")
 
         # ── 5) 报价（降级：失败则 quote 为 None）──────────────
         quote = None

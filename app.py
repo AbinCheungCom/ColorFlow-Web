@@ -3,12 +3,15 @@
 from flask import Flask, render_template, request, jsonify, Response
 import os
 import base64
+import io
 import tempfile
 import logging
 import time
 import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 
+from PIL import Image
 from colorflow_sdk import ColorFlowSDK
 from colorflow_sdk.exceptions import ValidationError
 from mcp_print.tools.colors import pantone_to_cmyk
@@ -22,10 +25,6 @@ from vision_backends import (
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB
-# 上传目录：桌面封装（colorflow_desktop_app.py）通过 COLORFLOW_UPLOAD_DIR 指向临时目录；
-# 未设置时回退到 /tmp（Linux/macOS 或已 chdir 的 Windows）
-_upload_dir = os.getenv("COLORFLOW_UPLOAD_DIR") or "/tmp/colorflow-uploads"
-os.makedirs(_upload_dir, exist_ok=True)
 
 # === 日志配置：便于排查 "Failed to fetch" 等异常 ===
 logging.basicConfig(
@@ -52,8 +51,8 @@ def handle_preflight():
     if request.method == "OPTIONS":
         return Response(status=204)
 
-# Initialize SDK
-sdk = ColorFlowSDK(output_dir="/tmp/colorflow-output")
+# Initialize SDK（output_dir 可通过 COLORFLOW_OUTPUT_DIR 环境变量覆盖）
+sdk = ColorFlowSDK(output_dir=os.getenv("COLORFLOW_OUTPUT_DIR", "/tmp/colorflow-output"))
 
 _START_TIME = time.time()  # 进程启动时间戳（供 /healthz 上报 uptime）
 
@@ -161,7 +160,7 @@ def _require_hex(hex_color):
 
 
 def _get_uploaded_image():
-    """校验并读取上传图片。
+    """校验并读取上传图片（魔数校验，不信任浏览器 Content-Type）。
 
     Returns:
         (image_bytes, image_format) 成功；失败时返回 (None, (error_response, status))。
@@ -173,20 +172,38 @@ def _get_uploaded_image():
     if not file.filename:
         return None, (jsonify({"error": "Empty file"}), 400)
 
-    content_type = file.content_type or "image/png"
-    if content_type not in ALLOWED_CONTENT_TYPES:
+    raw = file.read()
+    if not raw:
+        return None, (jsonify({"error": "Empty file"}), 400)
+
+    # 魔数校验：以文件头判断真实格式，不信任浏览器声明的 Content-Type
+    image_format = _sniff_image_format(raw)
+    if image_format is None:
         return None, (
-            jsonify({"error": f"Unsupported file type: {content_type}"}),
+            jsonify({"error": "Unsupported file type: not a valid PNG/JPEG/WebP/BMP"}),
             415,
         )
+    return (raw, image_format), None
 
-    format_map = {
-        "image/png": "png",
-        "image/jpeg": "jpeg",
-        "image/webp": "webp",
-        "image/bmp": "bmp",
-    }
-    return (file.read(), format_map[content_type]), None
+
+# 文件头魔数（前几个字节即可判定真实格式）
+_MAGIC_BYTES = {
+    b"\x89PNG": "png",
+    b"\xff\xd8\xff": "jpeg",
+    b"RIFF": "webp",   # WebP 以 RIFF....WEBP 开头
+    b"BM": "bmp",
+}
+
+
+def _sniff_image_format(raw: bytes):
+    """根据文件头魔数判定图片格式，无法识别返回 None。"""
+    for magic, fmt in _MAGIC_BYTES.items():
+        if raw.startswith(magic):
+            # WebP 需进一步确认第 8-12 字节为 WEBP
+            if fmt == "webp" and raw[8:12] != b"WEBP":
+                continue
+            return fmt
+    return None
 
 
 def _trace_parameters():
@@ -235,9 +252,11 @@ def _trace_parameters():
 # fill="rgb(255,255,255)" 的底层 <path>——把它移除，SVG 自然就透明。
 #
 # 容差默认 16：JPEG 压缩会让纯白背景变成 #F0F0F0 上下，需要一定宽容度。
-import io as _io
 import re as _re
 import xml.etree.ElementTree as _ET
+
+_ET.register_namespace("", "http://www.w3.org/2000/svg")
+_ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
 
 _RGB_RE = _re.compile(r"rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)", _re.I)
 _HEX_RE = _re.compile(r"#([0-9a-f]{3}|[0-9a-f]{6})\b", _re.I)
@@ -269,9 +288,6 @@ def _strip_white_paths(svg_bytes, tolerance=16):
     except _ET.ParseError:
         return svg_bytes  # 解析失败 → 原样返回，不影响主流程
 
-    _ET.register_namespace("", "http://www.w3.org/2000/svg")
-    _ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
-
     def is_near_white(v):
         c = _parse_svg_color(v)
         return c is not None and all(ch >= 255 - tolerance for ch in c)
@@ -281,7 +297,7 @@ def _strip_white_paths(svg_bytes, tolerance=16):
         for ch in to_remove:
             parent.remove(ch)
 
-    out = _io.BytesIO()
+    out = io.BytesIO()
     _ET.ElementTree(root).write(out, encoding="utf-8", xml_declaration=True)
     return out.getvalue()
 
@@ -336,14 +352,10 @@ def _trace_svg(image_bytes, image_format, params):
         cutout_params = _cutout_parameters()
         cutout_model = cutout_params.pop("model", "silueta")
         rgba = _rembg_cutout(image_bytes, model=cutout_model, **cutout_params)
-        import io as _bio
 
-        flat = _bio.BytesIO()
-        from PIL import Image as _PILImage
-
-        white_bg = _PILImage.new("RGB", rgba.size, (255, 255, 255))
+        white_bg = Image.new("RGB", rgba.size, (255, 255, 255))
         white_bg.paste(rgba, mask=rgba.split()[3])
-        flat_buf = _bio.BytesIO()
+        flat_buf = io.BytesIO()
         white_bg.save(flat_buf, format="PNG")
         svg_bytes = sdk.trace_bytes(flat_buf.getvalue(), image_format="png", **trace_kwargs)
         return _strip_white_paths(svg_bytes), True  # 抠图恒透明
@@ -410,8 +422,6 @@ def _get_rembg_session(model="silueta"):
 
 def _rembg_cutout(image_bytes, model="silueta", **kwargs):
     """位图字节 → rembg 抠图 → 透明底 RGBA PIL Image（复用缓存 session，精度参数透传）"""
-    import io as _bio
-
     from rembg import remove as _rembg_remove
 
     session = _get_rembg_session(model)
@@ -456,11 +466,7 @@ def _cutout_parameters():
 
 
 def _bio_open_rgba(data):
-    import io as _bio
-
-    from PIL import Image
-
-    return Image.open(_bio.BytesIO(data)).convert("RGBA")
+    return Image.open(io.BytesIO(data)).convert("RGBA")
 
 
 @app.route("/api/cutout", methods=["POST"])
@@ -476,12 +482,8 @@ def cutout_api():
     model = params.pop("model", "silueta")
 
     try:
-        import io as _b
-
-        from PIL import Image
-
         rgba = _rembg_cutout(image_bytes, model=model, **params)  # 复用缓存 session + 精度参数
-        buf = _b.BytesIO()
+        buf = io.BytesIO()
         rgba.save(buf, format="PNG")
         png_bytes = buf.getvalue()
         return jsonify(
@@ -903,7 +905,7 @@ def restart_service():
         # 用 powershell 启动脚本，detached 模式（不阻塞 Flask 响应）
         subprocess.Popen(
             ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps1],
-            creationflags=subprocess.CREATE_NO_WINDOW,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             cwd=os.path.dirname(ps1),
         )
         return jsonify({
@@ -1002,6 +1004,9 @@ _JOBS = {}
 _JOBS_LOCK = threading.Lock()
 _JOB_TTL = 600          # 任务保留 10 分钟
 _JOB_PROGRESS_MSG = "生成中，通常 10–60 秒…"
+
+# 有界线程池：限制异步生图/批量任务的并发数，防止无界线程耗尽内存
+_GEN_EXECUTOR = ThreadPoolExecutor(max_workers=int(os.getenv("GEN_MAX_WORKERS", "4")))
 
 
 def _prune_jobs_locked():
@@ -1155,7 +1160,7 @@ def gen_jobs_create():
             "created_at": now,
         }
 
-    threading.Thread(target=_gen_job_worker, args=(job_id, params), daemon=True).start()
+    _GEN_EXECUTOR.submit(_gen_job_worker, job_id, params)
     return jsonify({"success": True, "job_id": job_id, "status": "queued"})
 
 
@@ -1310,11 +1315,7 @@ def gen_batch_create():
             "created_at": now,
         }
 
-    threading.Thread(
-        target=_gen_batch_worker,
-        args=(batch_id, prompts, backend, size, n, model, ref_image),
-        daemon=True,
-    ).start()
+    _GEN_EXECUTOR.submit(_gen_batch_worker, batch_id, prompts, backend, size, n, model, ref_image)
     return jsonify({"success": True, "batch_id": batch_id,
                     "status": "queued", "prompt_count": len(prompts)})
 
@@ -1547,117 +1548,6 @@ def prompt_template_render():
     except Exception as e:
         logger.exception("prompt_template_render 失败")
         return jsonify({"error": str(e)}), 500
-
-
-# ============================================================
-# 运行时配置（大模型 API / MCP Key）
-# ============================================================
-#
-# 设置页「大模型 API」和「MCP API Key」标签通过本组端点读写运行时配置。
-# Key 仅存当前进程内存（os.environ），不进镜像/磁盘，重启后需重新配置
-# 或通过环境变量注入。前端 Key 存储于 localStorage（MCP Key）。
-# 响应中 Key 值脱敏（仅显示前 6 位 + 后 4 位），绝不回显完整明文。
-
-def _mask_key(k: str, show_prefix: int = 6, show_suffix: int = 4) -> str:
-    """脱敏 Key：仅显示前 N 位和后 M 位"""
-    if not k:
-        return ""
-    if len(k) <= show_prefix + show_suffix + 3:
-        return k[:show_prefix] + "…" + k[-show_suffix:]
-    return k[:show_prefix] + "…" + k[-show_suffix:]
-
-
-@app.route("/api/config/llm", methods=["GET"])
-def get_llm_config():
-    """获取大模型 API 当前配置（脱敏）。"""
-    openai_key = os.getenv("OPENAI_API_KEY", "")
-    claude_key = os.getenv("ANTHROPIC_API_KEY", "")
-    return jsonify({
-        "success": True,
-        "openai": {
-            "key": _mask_key(openai_key) if openai_key else "",
-            "key_set": bool(openai_key),
-            "base_url": os.getenv("OPENAI_BASE_URL", ""),
-            "model": os.getenv("VISION_MODEL_OPENAI", "gpt-4o"),
-        },
-        "claude": {
-            "key": _mask_key(claude_key) if claude_key else "",
-            "key_set": bool(claude_key),
-            "base_url": os.getenv("ANTHROPIC_BASE_URL", ""),
-            "model": os.getenv("VISION_MODEL_CLAUDE", "claude-sonnet-4-6"),
-        },
-        "vision_backends": vision_available_backends(),
-    })
-
-
-@app.route("/api/config/llm", methods=["POST"])
-def set_llm_config():
-    """保存大模型 API 配置（写入当前进程 os.environ）。
-
-    JSON body:
-        openai_key:     OpenAI API Key（空串表示清除）
-        openai_base:    OpenAI Base URL（可选）
-        openai_model:   OpenAI 模型名（可选）
-        claude_key:     Anthropic API Key（空串表示清除）
-        claude_base:    Anthropic Base URL（可选）
-        claude_model:   Claude 模型名（可选）
-    """
-    data = request.get_json(silent=True) or {}
-    updates = {}
-
-    # OpenAI
-    if "openai_key" in data:
-        v = (data["openai_key"] or "").strip()
-        if v:
-            os.environ["OPENAI_API_KEY"] = v
-            updates["OPENAI_API_KEY"] = v[:6] + "…"
-        else:
-            os.environ.pop("OPENAI_API_KEY", None)
-            updates["OPENAI_API_KEY"] = "(已清除)"
-    if "openai_base" in data:
-        v = (data["openai_base"] or "").strip()
-        if v:
-            os.environ["OPENAI_BASE_URL"] = v
-            updates["OPENAI_BASE_URL"] = v
-        else:
-            os.environ.pop("OPENAI_BASE_URL", None)
-    if "openai_model" in data:
-        v = (data["openai_model"] or "").strip()
-        if v:
-            os.environ["VISION_MODEL_OPENAI"] = v
-            updates["VISION_MODEL_OPENAI"] = v
-
-    # Claude
-    if "claude_key" in data:
-        v = (data["claude_key"] or "").strip()
-        if v:
-            os.environ["ANTHROPIC_API_KEY"] = v
-            updates["ANTHROPIC_API_KEY"] = v[:6] + "…"
-        else:
-            os.environ.pop("ANTHROPIC_API_KEY", None)
-            updates["ANTHROPIC_API_KEY"] = "(已清除)"
-    if "claude_base" in data:
-        v = (data["claude_base"] or "").strip()
-        if v:
-            os.environ["ANTHROPIC_BASE_URL"] = v
-            updates["ANTHROPIC_BASE_URL"] = v
-        else:
-            os.environ.pop("ANTHROPIC_BASE_URL", None)
-    if "claude_model" in data:
-        v = (data["claude_model"] or "").strip()
-        if v:
-            os.environ["VISION_MODEL_CLAUDE"] = v
-            updates["VISION_MODEL_CLAUDE"] = v
-
-    if not updates:
-        return jsonify({"error": "无配置更新"}), 400
-
-    return jsonify({
-        "success": True,
-        "updated": updates,
-        "vision_backends": vision_available_backends(),
-        "note": "配置已生效（当前进程），重启后需重新配置或通过环境变量注入",
-    })
 
 
 # ============================================================

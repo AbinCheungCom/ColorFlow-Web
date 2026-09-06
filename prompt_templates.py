@@ -32,13 +32,18 @@ class TemplateError(Exception):
 # ── 模块级缓存 ──────────────────────────────────────
 _cache = None
 _cache_path = None
+_cache_mtime = None
 
 
 def _load(path: str = None):
     """加载并缓存模板 JSON。文件变更时（mtime 不同）重新加载。"""
-    global _cache, _cache_path
+    global _cache, _cache_path, _cache_mtime
     p = path or _TEMPLATE_PATH
-    if _cache is not None and _cache_path == p:
+    try:
+        mtime = os.path.getmtime(p)
+    except OSError:
+        mtime = None
+    if _cache is not None and _cache_path == p and mtime == _cache_mtime:
         return _cache
     try:
         with open(p, "r", encoding="utf-8") as f:
@@ -47,14 +52,16 @@ def _load(path: str = None):
         raise TemplateError("file_error", f"模板文件加载失败: {e}")
     _cache = data
     _cache_path = p
+    _cache_mtime = mtime
     return data
 
 
 def reload_templates(path: str = None):
     """强制重新加载模板（测试用）"""
-    global _cache, _cache_path
+    global _cache, _cache_path, _cache_mtime
     _cache = None
     _cache_path = None
+    _cache_mtime = None
     return _load(path)
 
 

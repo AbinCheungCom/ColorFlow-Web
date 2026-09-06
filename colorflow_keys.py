@@ -28,7 +28,6 @@ class KeyStore:
 
     def __init__(self, path=None):
         self.path = path or _DEFAULT_PATH
-        self._cache = None
 
     # ---- 文件读写 ----
 
@@ -73,11 +72,6 @@ class KeyStore:
             os.chmod(self.path, 0o600)
         except OSError:
             pass
-        self._cache = keys
-
-    def _flush(self):
-        """强制从磁盘重新加载"""
-        self._cache = None
 
     # ---- 公开 API ----
 
@@ -126,7 +120,7 @@ class KeyStore:
         result = []
         for entry in keys:
             k = entry["key"]
-            masked = k[:8] + "****" + k[-4:] if len(k) > 12 else "****"
+            masked = k[:6] + "****" + k[-4:] if len(k) > 12 else "****"
             result.append({
                 "key_id": entry["key_id"],
                 "key_masked": masked,

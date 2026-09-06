@@ -198,7 +198,7 @@ def openai_backend(prompt: str, image: bytes, timeout: int = 120, model: str = "
         raise PromptError("upstream", "OpenAI 返回非 JSON 响应", retryable=True)
     try:
         text = resp["choices"][0]["message"]["content"].strip()
-    except (KeyError, IndexError, TypeError) as e:
+    except (KeyError, IndexError, TypeError, AttributeError) as e:
         raise PromptError("upstream", f"OpenAI 响应结构异常: {resp}", retryable=False)
     if not text:
         raise PromptError("upstream", "OpenAI 返回空 prompt", retryable=False)
@@ -320,6 +320,10 @@ def _dispatch_auto(image: bytes, **kw) -> PromptResult:
                            bid, e.code, e.retryable, e)
             if not e.retryable and e.code == "bad_image":
                 break
+            continue
+        except Exception as e:
+            last_err = PromptError("upstream", f"后端 {bid} 异常: {type(e).__name__}", retryable=True)
+            logger.warning("Vision 后端 %s 异常: %s — 尝试下一后端", bid, e, exc_info=True)
             continue
     # 所有真实后端失败 → 降级到 mock
     logger.warning("所有真实 Vision 后端失败，降级到 mock；last_err=%s", last_err)

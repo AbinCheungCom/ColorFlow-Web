@@ -24,13 +24,14 @@
 
 import os
 import sys
+import tempfile
 
 
 def main():
     from waitress import serve
     from app import app
 
-    host = os.getenv("HOST", "0.0.0.0")
+    host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "5000"))
     threads = int(os.getenv("THREADS", "4"))
     channel_timeout = int(os.getenv("WAITRESS_CHANNEL_TIMEOUT", "75"))
@@ -47,7 +48,7 @@ def main():
             print(f"[serve] U2NET_HOME -> {bundled_models}")
 
     # 输出目录：默认 /tmp，容器内建议挂载卷
-    output_dir = os.getenv("COLORFLOW_OUTPUT_DIR", "/tmp/colorflow-output")
+    output_dir = os.getenv("COLORFLOW_OUTPUT_DIR", os.path.join(tempfile.gettempdir(), "colorflow-output"))
     if not os.path.isdir(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 

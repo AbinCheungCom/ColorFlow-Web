@@ -23,5 +23,5 @@ htmlcov/
 # rembg 模型缓存（非仓库内置的下载模型）
 models/models/
 
-# ��ģ���ļ���ͨ�� download_models.py ���أ�
+# 大模型文件（通过 download_models.py 下载）
 models/u2net_human_seg.onnx

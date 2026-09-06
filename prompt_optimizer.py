@@ -92,8 +92,8 @@ def _get_base(provider: str, default: str) -> str:
     try:
         from llm_keys import llm_keystore
         cfg = llm_keystore.get_config(provider)
-        if cfg and isinstance(cfg, dict):
-            return cfg.get("base_url", "")
+        if cfg and isinstance(cfg, dict) and cfg.get("base_url"):
+            return cfg["base_url"]
     except Exception:
         pass
     env_key = {"openai": "OPENAI_BASE_URL"}.get(provider, "")
@@ -172,7 +172,7 @@ def _openai_optimize(prompt: str, model: str = "", timeout: int = 60) -> Optimiz
         raise OptimizeError("upstream", "非 JSON 响应", retryable=True)
     try:
         text = resp["choices"][0]["message"]["content"].strip()
-    except (KeyError, IndexError, TypeError):
+    except (KeyError, IndexError, TypeError, AttributeError):
         raise OptimizeError("upstream", f"响应结构异常: {resp}", retryable=False)
     if not text:
         raise OptimizeError("upstream", "空响应", retryable=False)

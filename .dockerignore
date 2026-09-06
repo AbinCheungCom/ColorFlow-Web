@@ -28,6 +28,8 @@ env/
 .coverage
 htmlcov/
 tests/__pycache__/
+tests/
+.github/
 
 # 产物 / 临时文件
 *.zip

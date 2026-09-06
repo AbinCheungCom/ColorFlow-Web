@@ -1,6 +1,9 @@
 flask>=3.0.0
-mcp-print>=0.1.0
-colorflow-sdk @ git+https://github.com/Abinius/ColorFlow.git
+# pin 到已验证的版本：mcp_print 的 _hex_to_rgb / _rgb_to_lab / _cmyk_to_lab / _load_db 是下划线前缀私有 API
+mcp-print==0.5.0
+colorflow-sdk @ git+https://github.com/Abinius/ColorFlow.git@2ef5016fc1e2710b9e15a88346f22fe7e330681b
+# pin 到已验证 commit（与本地 editable 安装 D:\Abin\abincheung\WEB\ColorFlow 一致）；
+# 升级 SDK 后需同步更新此 commit 并跑回归测试
 fastmcp>=2.0.0
 # 抠图功能（Web 端「抠图 (Cutout)」模式）；国内安装可加 -i https://pypi.tuna.tsinghua.edu.cn/simple
 rembg[cpu]>=2.0.0

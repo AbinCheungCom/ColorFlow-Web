@@ -90,7 +90,7 @@ class TestTrace:
         resp = client.post(
             "/api/trace",
             data={
-                "image": (io.BytesIO(b"fake"), "a.png"),
+                "image": (io.BytesIO(_synth_png_bytes()), "a.png"),
                 "mode": "invalid-mode",
             },
             content_type="multipart/form-data",

@@ -14,7 +14,9 @@
 模型源：https://github.com/danielgatis/rembg/releases
 """
 
+import hashlib
 import os
+import socket
 import sys
 import urllib.request
 
@@ -26,47 +28,85 @@ MODELS = {
         "url": "https://github.com/danielgatis/rembg/releases/download/v1.0/silueta.onnx",
         "size_mb": 42,
         "desc": "通用 · 快速（默认）",
+        "sha256": "",  # 填入后启用完整性校验
     },
     "u2net_human_seg": {
         "file": "u2net_human_seg.onnx",
         "url": "https://github.com/danielgatis/rembg/releases/download/v1.0/u2net_human_seg.onnx",
         "size_mb": 168,
         "desc": "人像 · 精细",
+        "sha256": "",
     },
 }
 
+_DOWNLOAD_TIMEOUT = 300  # 单次连接超时秒数
+
+
+def _verify_sha256(path: str, expected: str) -> bool:
+    """校验文件 sha256 摘要是否匹配。"""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(64 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest() == expected
+
+
+def _download_with_timeout(url: str, target: str, size_mb: int):
+    """下载 url 到 target（带超时 + 进度），避免 urlretrieve 无超时永久挂起。"""
+    old = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(_DOWNLOAD_TIMEOUT)
+    try:
+        with urllib.request.urlopen(url) as resp:
+            total_hdr = resp.headers.get("Content-Length")
+            total = int(total_hdr) if total_hdr else size_mb * 1024 * 1024
+            downloaded = 0
+            with open(target, "wb") as f:
+                while True:
+                    chunk = resp.read(64 * 1024)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    pct = downloaded / total * 100
+                    mb = downloaded / 1024 / 1024
+                    total_mb = total / 1024 / 1024
+                    sys.stdout.write(f"\r    {mb:.1f} / {total_mb:.1f} MB ({pct:.1f}%)")
+                    sys.stdout.flush()
+    finally:
+        socket.setdefaulttimeout(old)
+
 
 def download_model(name: str, info: dict) -> bool:
-    """下载单个模型到 models/ 目录。"""
+    """下载单个模型到 models/ 目录（临时文件 + 原子替换 + 可选 sha256 校验）。"""
     target = os.path.join(MODELS_DIR, info["file"])
+    expected_sha = info.get("sha256", "")
 
     if os.path.exists(target):
-        size = os.path.getsize(target)
-        print(f"  ✓ {info['file']} 已存在 ({size/1024/1024:.1f} MB)")
-        return True
+        if expected_sha and not _verify_sha256(target, expected_sha):
+            print(f"  ✗ {info['file']} 已存在但 sha256 校验失败，重新下载")
+        else:
+            size = os.path.getsize(target)
+            print(f"  ✓ {info['file']} 已存在 ({size/1024/1024:.1f} MB)")
+            return True
 
     print(f"  下载 {info['file']} ({info['size_mb']} MB) — {info['desc']}")
 
-    def hook(count, block_size, total_size):
-        downloaded = count * block_size
-        if total_size > 0:
-            pct = downloaded / total_size * 100
-            mb = downloaded / 1024 / 1024
-            total_mb = total_size / 1024 / 1024
-            sys.stdout.write(f"\r    {mb:.1f} / {total_mb:.1f} MB ({pct:.1f}%)")
-            sys.stdout.flush()
-
+    tmp_path = target + ".tmp"
     try:
-        urllib.request.urlretrieve(info["url"], target, hook)
+        _download_with_timeout(info["url"], tmp_path, info["size_mb"])
         print()
+        if expected_sha and not _verify_sha256(tmp_path, expected_sha):
+            print(f"  ✗ {info['file']} sha256 校验失败（文件可能被篡改）")
+            os.remove(tmp_path)
+            return False
+        os.replace(tmp_path, target)  # 原子替换，避免残留半截文件
         size = os.path.getsize(target)
         print(f"  ✓ {info['file']} 下载完成 ({size/1024/1024:.1f} MB)")
         return True
     except Exception as e:
         print(f"\n  ✗ 下载失败: {e}")
-        # 清理不完整文件
-        if os.path.exists(target):
-            os.remove(target)
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
         return False
 
 

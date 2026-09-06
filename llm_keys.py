@@ -105,7 +105,6 @@ class LLMKeyStore:
 
     def __init__(self, path=None):
         self.path = path or _DEFAULT_PATH
-        self._cache = None
 
     def _load(self):
         try:
@@ -127,10 +126,6 @@ class LLMKeyStore:
             os.chmod(self.path, 0o600)
         except OSError:
             pass
-        self._cache = data
-
-    def _flush(self):
-        self._cache = None
 
     # ---- 公开 API ----
 

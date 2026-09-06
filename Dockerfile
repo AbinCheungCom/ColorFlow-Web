@@ -34,15 +34,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 拷源码（排除 .git / venv / 模型等大文件，见 .dockerignore）
 COPY . .
 
-# 抠图模型：随镜像附带（~42MB，启动即用，无需联网下载）
-RUN mkdir -p /app/models && \
-    if [ ! -f /app/models/silueta.onnx ]; then \
-        echo "WARN: silueta.onnx 未找到，将在首次抠图时联网下载" && \
-    fi
-
-# 运行时目录
-RUN mkdir -p /tmp/colorflow-uploads /tmp/colorflow-output /tmp/colorflow-gen \
-    && chown -R 10001:10001 /tmp/colorflow-uploads /tmp/colorflow-output /tmp/colorflow-gen /app
+# 运行时目录（uploads 目录已废弃，上传走内存处理）
+RUN mkdir -p /tmp/colorflow-output /tmp/colorflow-gen \
+    && chown -R 10001:10001 /tmp/colorflow-output /tmp/colorflow-gen /app
 
 # 非 root 用户
 USER 10001
