@@ -366,27 +366,46 @@ def _trace_svg(image_bytes, image_format, params):
 # 解决：全局缓存 rembg session，模型只加载一次，后续请求直接复用。
 
 _rembg_sessions: dict = {}
-_rembg_session_errors: dict = {}  # 模型加载失败缓存，避免重复下载
+_rembg_session_errors: dict = {}  # 模型名 -> (异常, 失败时间戳)
 _rembg_session_lock = threading.Lock()
+_REMBG_RETRY_AFTER_SECONDS = 15  # 可恢复失败后重试间隔（模型文件就位/网络恢复后自动生效）
+
+
+def _is_deterministic_failure(e: Exception) -> bool:
+    """确定性失败（重试无意义）：模型不受支持 / 无 session 类。"""
+    msg = str(e).lower()
+    return "not supported" in msg or "no session class" in msg
 
 
 def _get_rembg_session(model="silueta"):
     """获取（并缓存）rembg session，按模型名分表缓存，避免每次请求重新加载。
-    模型加载失败时缓存错误，后续请求直接返回错误，不再重试下载。
+
+    失败处理分两类：
+      - 确定性失败（模型不支持）：永久缓存，重试无意义；
+      - 可恢复失败（模型文件缺失 / 网络下载超时等）：按冷却期重试，
+        模型文件就位或网络恢复后自动成功，不再永久卡在错误状态。
     """
     with _rembg_session_lock:
-        if model in _rembg_session_errors:
-            raise _rembg_session_errors[model]
-        if model not in _rembg_sessions:
-            from rembg import new_session
+        if model in _rembg_sessions:
+            return _rembg_sessions[model]
 
-            try:
-                _rembg_sessions[model] = new_session(model)
-            except Exception as e:
-                # 缓存错误（ValueError: model not supported; ConnectTimeout: 下载超时等）
-                _rembg_session_errors[model] = e
-                raise
-    return _rembg_sessions[model]
+        cached = _rembg_session_errors.get(model)
+        if cached:
+            exc, failed_at = cached
+            if _is_deterministic_failure(exc) or time.time() - failed_at < _REMBG_RETRY_AFTER_SECONDS:
+                raise exc
+            # 冷却期已过 → 落入下方重新尝试加载
+            _rembg_session_errors.pop(model, None)
+
+        from rembg import new_session
+
+        try:
+            _rembg_sessions[model] = new_session(model)
+            _rembg_session_errors.pop(model, None)  # 加载成功则清除历史错误
+            return _rembg_sessions[model]
+        except Exception as e:
+            _rembg_session_errors[model] = (e, time.time())
+            raise
 
 
 def _rembg_cutout(image_bytes, model="silueta", **kwargs):

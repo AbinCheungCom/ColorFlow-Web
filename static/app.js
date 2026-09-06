@@ -324,7 +324,7 @@ if (restartBtn) {
   restartBtn.addEventListener('click', async () => {
     restartBtn.disabled = true;
     const origHTML = restartBtn.innerHTML;
-    restartBtn.innerHTML = '<span class="btn-text">重启中...</span>';
+    restartBtn.innerHTML = '<span class="spinner sm"></span><span class="btn-text">重启中...</span>';
     restartHint.textContent = '';
     try {
       const resp = await apiFetch('/api/restart', { method: 'POST' });
@@ -393,7 +393,7 @@ cutoutBtn.addEventListener('click', async () => {
   cutoutBtn.disabled = true;
   cutoutBtn.querySelector('.btn-text').classList.add('hidden');
   cutoutBtn.querySelector('.btn-loader').classList.remove('hidden');
-  cutoutPreview.innerHTML = '<div class="svg-placeholder">AI 抠图中...</div>';
+  cutoutPreview.innerHTML = '<div class="svg-placeholder"><span class="spinner"></span>AI 抠图中...</div>';
   cutoutInfo.classList.add('hidden');
 
   const formData = new FormData();
@@ -597,7 +597,7 @@ document.getElementById('exportPdfConfirm').addEventListener('click', async () =
   const b = parseFloat(document.getElementById('expBleed').value) || 0;
   if (!w || !h) { alert('请输入成品尺寸'); return; }
   const btn = document.getElementById('exportPdfConfirm');
-  btn.disabled = true; btn.textContent = '生成中...';
+  btn.disabled = true; btn.innerHTML = '<span class="spinner sm"></span>生成中...';
   try {
     const formData = new FormData();
     formData.append('image', traceFile.files[0]);
@@ -631,7 +631,7 @@ let paletteExportData = null;
 colorMatchBtn.addEventListener('click', async () => {
   if (!traceFile.files[0]) return;
   colorMatchBtn.disabled = true;
-  colorMatchBtn.textContent = '提取中...';
+  colorMatchBtn.innerHTML = '<span class="spinner sm"></span>提取中...';
   paletteResults.classList.remove('hidden');
   paletteResults.innerHTML = '<div class="match-placeholder">正在描图并提取主色...</div>';
 
@@ -723,7 +723,7 @@ colorMatchBtn.addEventListener('click', async () => {
     document.getElementById('paletteExportBtn').addEventListener('click', async () => {
       const btn = document.getElementById('paletteExportBtn');
       btn.disabled = true;
-      btn.textContent = '生成中...';
+      btn.innerHTML = '<span class="spinner sm"></span>生成中...';
       try {
         const resp = await apiFetch('/api/pantone/export', {
           method: 'POST',
@@ -811,7 +811,7 @@ const pantoneExportBtn = document.getElementById('pantoneExportBtn');
 if (pantoneExportBtn) {
   pantoneExportBtn.addEventListener('click', async () => {
     if (!pantoneLookupResult) return;
-    pantoneExportBtn.textContent = '生成中...';
+    pantoneExportBtn.innerHTML = '<span class="spinner sm"></span>生成中...';
     try {
       const resp = await apiFetch('/api/pantone/export', {
         method: 'POST',
@@ -858,7 +858,7 @@ matchBtn.addEventListener('click', async () => {
   if (!hex.startsWith('#')) hex = '#' + hex;
   if (hex.length !== 7) return;
 
-  matchResults.innerHTML = '<div class="match-placeholder">查询中...</div>';
+  matchResults.innerHTML = '<div class="match-placeholder"><span class="spinner"></span>查询中...</div>';
 
   try {
     const resp = await apiFetch('/api/pantone/match', {
@@ -901,7 +901,7 @@ const matchExportBtn = document.getElementById('matchExportBtn');
 if (matchExportBtn) {
   matchExportBtn.addEventListener('click', async () => {
     if (!matchExportData) return;
-    matchExportBtn.textContent = '生成中...';
+    matchExportBtn.innerHTML = '<span class="spinner sm"></span>生成中...';
     try {
       const resp = await apiFetch('/api/pantone/export', {
         method: 'POST',
@@ -964,7 +964,7 @@ g3dBtn.addEventListener('click', async () => {
   g3dBtn.disabled = true;
   g3dBtn.querySelector('.btn-text').classList.add('hidden');
   g3dBtn.querySelector('.btn-loader').classList.remove('hidden');
-  g3dPreview.innerHTML = '<div class="svg-placeholder">生成灰度图中...</div>';
+  g3dPreview.innerHTML = '<div class="svg-placeholder"><span class="spinner"></span>生成灰度图中...</div>';
   g3dHist.classList.add('hidden');
   g3dInfo.classList.add('hidden');
 
@@ -1655,7 +1655,7 @@ if (genOptimizeBtn) {
     const prompt = genPrompt.value.trim();
     if (!prompt) { genPromptHint.textContent = '请先输入 prompt'; return; }
     genOptimizeBtn.disabled = true;
-    genPromptHint.innerHTML = ico('sparkles') + '优化中…';
+    genPromptHint.innerHTML = '<span class="spinner sm"></span>优化中…';
     try {
       const resp = await apiFetch('/api/prompt/optimize', {
         method: 'POST',
@@ -1687,7 +1687,7 @@ if (genBtn) {
     const promptText = genPrompt.value.trim();
     if (!promptText) { genPromptHint.textContent = '请先输入 prompt'; return; }
     genBtn.disabled = true;
-    genBtn.querySelector('.btn-text').textContent = '提交中…';
+    genBtn.querySelector('.btn-text').innerHTML = '<span class="spinner sm"></span>提交中…';
 
     if (_genMode === 'batch') {
       // 批量模式
@@ -1713,7 +1713,7 @@ if (genBtn) {
       }
     } else {
       // 单张模式（原有逻辑）
-      genPromptHint.innerHTML = ico('sparkles') + '生成中…';
+      genPromptHint.innerHTML = '<span class="spinner sm"></span>生成中…';
       try {
         const formData = new FormData();
         formData.append('prompt', promptText);
@@ -1752,7 +1752,7 @@ async function pollBatchJob(batchId, prompts) {
         genPromptHint.innerHTML = ico('close') + escapeHtml(job.error || '批量失败');
         return;
       }
-      genPromptHint.textContent = job.progress || '批量处理中…';
+      genPromptHint.innerHTML = '<span class="spinner sm"></span>' + (job.progress || '批量处理中…');
     } catch (e) { /* 继续轮询 */ }
   }
   genPromptHint.innerHTML = ico('clock') + '批量超时，请重试';

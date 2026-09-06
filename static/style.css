@@ -714,6 +714,24 @@ body {
 
 .btn-loader { font-size: 14px; }
 
+/* === 动态加载图标（旋转圆环，随 currentColor 变色） === */
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: -2px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.spinner.sm { width: 11px; height: 11px; border-width: 1.5px; margin-right: 4px; }
+.spinner.lg { width: 18px; height: 18px; border-width: 2.5px; }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* accent = pastel color block (brand story moment) */
 .btn-accent {
   background: var(--block-lime);
