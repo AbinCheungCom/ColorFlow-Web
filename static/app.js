@@ -612,8 +612,9 @@ document.getElementById('exportPdfConfirm').addEventListener('click', async () =
       return;
     }
     const blob = await resp.blob();
-    downloadData(URL.createObjectURL(blob), 'colorflow_print.pdf');
-    URL.revokeObjectURL(a.href);
+    const url = URL.createObjectURL(blob);
+    downloadData(url, 'colorflow_print.pdf');
+    URL.revokeObjectURL(url);
   } catch (e) {
     alert('导出失败: ' + fetchErrorMessage(e));
   } finally {
@@ -739,8 +740,9 @@ colorMatchBtn.addEventListener('click', async () => {
           return;
         }
         const blob = await resp.blob();
-        downloadData(URL.createObjectURL(blob), 'colorflow_palette_report.pdf');
-        URL.revokeObjectURL(a.href);
+        const url = URL.createObjectURL(blob);
+        downloadData(url, 'colorflow_palette_report.pdf');
+        URL.revokeObjectURL(url);
       } catch (e) {
         alert('导出失败: ' + fetchErrorMessage(e));
       } finally {
@@ -824,8 +826,9 @@ if (pantoneExportBtn) {
       });
       if (!resp.ok) { const d = await resp.json().catch(() => ({})); alert('导出失败: ' + (d.error || resp.status)); return; }
       const blob = await resp.blob();
-      downloadData(URL.createObjectURL(blob), `pantone_${pantoneLookupResult.name.replace(/\s/g, '_')}.pdf`);
-      URL.revokeObjectURL(a.href);
+      const url = URL.createObjectURL(blob);
+      downloadData(url, `pantone_${pantoneLookupResult.name.replace(/\s/g, '_')}.pdf`);
+      URL.revokeObjectURL(url);
     } catch (e) {
       alert('导出失败: ' + fetchErrorMessage(e));
     } finally {
@@ -916,8 +919,9 @@ if (matchExportBtn) {
       });
       if (!resp.ok) { const d = await resp.json().catch(() => ({})); alert('导出失败: ' + (d.error || resp.status)); return; }
       const blob = await resp.blob();
-      downloadData(URL.createObjectURL(blob), `pantone_match_report.pdf`);
-      URL.revokeObjectURL(a.href);
+      const url = URL.createObjectURL(blob);
+      downloadData(url, `pantone_match_report.pdf`);
+      URL.revokeObjectURL(url);
     } catch (e) {
       alert('导出失败: ' + fetchErrorMessage(e));
     } finally {
@@ -1933,7 +1937,9 @@ if (genTplExportBtn) {
     const tpls = loadCustomTemplates();
     if (tpls.length === 0) { alert('暂无自定义模板可导出'); return; }
     const blob = new Blob([JSON.stringify(tpls, null, 2)], { type: 'application/json' });
-    downloadData(URL.createObjectURL(blob), 'colorflow_templates.json');
+    const url = URL.createObjectURL(blob);
+    downloadData(url, 'colorflow_templates.json');
+    URL.revokeObjectURL(url);
   });
 }
 
